@@ -1,0 +1,22 @@
+# deps / build
+node_modules/
+dist/
+target/
+*.local
+
+# tauri
+src-tauri/gen/
+
+# db e mídia locais de teste
+*.db
+!src-tauri/resources/dict.db
+media/
+
+# editor/os
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# env
+.env*

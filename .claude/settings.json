@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "allow": ["Bash(pnpm *)", "Bash(cargo *)", "Bash(git *)", "Bash(npx *)"],
+    "deny": ["Read(.env*)", "Write(.env*)"]
+  }
+}

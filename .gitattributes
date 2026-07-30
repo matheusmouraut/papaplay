@@ -1,0 +1,11 @@
+# Prettier esta configurado com endOfLine: lf — sem isto o checkout no Windows
+# converte para CRLF e `pnpm lint` falha.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary
+*.db binary
+*.webp binary
+*.onnx binary
+pnpm-lock.yaml -diff

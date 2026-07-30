@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* A janela overlay precisa ser totalmente transparente: nada de background
+   herdado do reset do Tailwind, senao o click-through fica visivel. */
+html,
+body,
+#root {
+  height: 100%;
+  background: transparent !important;
+  overflow: hidden;
+  /* Evita selecao de texto acidental por cima do jogo. */
+  user-select: none;
+  cursor: default;
+}

@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme {
+  --color-papa-bg: #0f1117;
+  --color-papa-surface: #171a23;
+  --color-papa-border: #262b38;
+  --color-papa-accent: #6ee7b7;
+  --color-papa-text: #e6e8ef;
+  --color-papa-muted: #8b93a7;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
