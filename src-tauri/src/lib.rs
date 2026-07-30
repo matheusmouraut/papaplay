@@ -4,6 +4,8 @@ pub mod dict;
 pub mod error;
 pub mod hotkeys;
 pub mod ocr;
+pub mod overlay;
+pub mod platform;
 pub mod translate;
 
 use tauri::Manager;
@@ -36,10 +38,20 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // A overlay comeca visivel e passiva — esse e o estado de repouso.
+            overlay::init(app.handle())?;
             hotkeys::register(app.handle())?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![ping])
+        .invoke_handler(tauri::generate_handler![
+            ping,
+            overlay::overlay_set_mode,
+            overlay::overlay_toggle,
+            overlay::overlay_status,
+            overlay::overlay_check_geometry,
+            overlay::overlay_bench,
+            overlay::overlay_reset_size,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
