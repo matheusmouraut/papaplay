@@ -16,6 +16,10 @@ pub enum Error {
     #[error("api do windows falhou: {0}")]
     Platform(String),
 
+    /// Falha do pipeline de OCR: carga dos modelos, inferencia ou decodificacao.
+    #[error("ocr falhou: {0}")]
+    Ocr(String),
+
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
 

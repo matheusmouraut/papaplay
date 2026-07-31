@@ -15,6 +15,12 @@ media/
 # capturas de tela avulsas das validações manuais (ficam só na máquina)
 imagens/
 
+# modelos de OCR: 11 MB de binário, refeitos por scripts/fetch-ocr-models.ps1
+src-tauri/resources/models/
+
+# saída visual do `ocr-spike --desenhar`, regerável a partir da fixture
+*.boxes.png
+
 # editor/os
 .vscode/
 .idea/

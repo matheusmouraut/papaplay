@@ -24,6 +24,15 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 
+# OCR (spike 02). `ort` nao tem release estavel — 2.0.0-rc.13 e a versao usada
+# em producao pela comunidade. Pinada em `=` de proposito: as rc mudam a API
+# entre si e um bump silencioso quebraria o build.
+ort = "=2.0.0-rc.13"
+image = { version = "0.25", default-features = false, features = [
+  "png",
+  "jpeg",
+] }
+
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"

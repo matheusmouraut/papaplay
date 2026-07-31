@@ -1,0 +1,24 @@
+{
+  "notes": "Configuracoes: fonte limpa, alto contraste, linhas bem separadas. E o piso da amostra - se esta reprovar, o problema e do pipeline, nao da tela.",
+  "kind": "menu",
+  "words": [
+    "Settings",
+    "Keyboard",
+    "Mouse",
+    "Adjust",
+    "Controller",
+    "Vibrations",
+    "On",
+    "Vibration",
+    "Intensity",
+    "Camera",
+    "Free",
+    "Horizontal",
+    "Sensitivity",
+    "Vertical",
+    "Fixed",
+    "Aimed",
+    "Esc",
+    "Close"
+  ]
+}
