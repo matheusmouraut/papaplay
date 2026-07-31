@@ -31,6 +31,43 @@ export interface OcrResult {
   capturedAt: string;
 }
 
+/** Retangulo de um monitor em pixels fisicos da area de trabalho virtual. */
+export interface MonitorRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Resultado de uma troca de modo da overlay (evento `overlay://mode`). */
+export interface OverlayModeChange {
+  /** `true` = modo lookup (recebe cliques); `false` = passivo (click-through). */
+  interactive: boolean;
+  /** Duracao da troca medida no core, em microssegundos. */
+  elapsedUs: number;
+  /** Titulo da janela em foco ao entrar em lookup. */
+  windowTitle: string | null;
+  monitor: MonitorRect | null;
+  scaleFactor: number;
+}
+
+export interface OverlayStatus {
+  interactive: boolean;
+  scaleFactor: number;
+}
+
+/** Estatisticas do benchmark de alternancia (evento `overlay://bench`). */
+export interface OverlayBenchReport {
+  iterations: number;
+  minUs: number;
+  maxUs: number;
+  meanUs: number;
+  p50Us: number;
+  p95Us: number;
+  failures: number;
+  samplesUs: number[];
+}
+
 /** Uma acepcao do dicionario. */
 export interface Sense {
   pos: string;

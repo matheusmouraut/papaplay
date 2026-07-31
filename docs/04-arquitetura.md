@@ -63,7 +63,8 @@ lemma_forms(form, lemma)                     -- "ran" → "run"
 
 -- Dados do usuário
 cards(id, lemma, created_at, suspended,
-      fsrs_due, fsrs_stability, fsrs_difficulty, fsrs_state, fsrs_reps, fsrs_lapses)
+      fsrs_due, fsrs_stability, fsrs_difficulty, fsrs_state, fsrs_reps, fsrs_lapses,
+      fsrs_scheduled_days, fsrs_learning_steps, fsrs_last_review)  -- campos completos do ts-fsrs
 card_senses(card_id, sense_text, chosen)     -- traduções escolhidas/editadas
 contexts(id, card_id, form, sentence_en, sentence_pt,
          game_name, screenshot_path, captured_at)
