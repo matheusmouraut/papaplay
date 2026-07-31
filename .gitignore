@@ -12,6 +12,9 @@ src-tauri/gen/
 !src-tauri/resources/dict.db
 media/
 
+# capturas de tela avulsas das validações manuais (ficam só na máquina)
+imagens/
+
 # editor/os
 .vscode/
 .idea/

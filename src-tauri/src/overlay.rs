@@ -146,59 +146,7 @@ pub fn init(app: &AppHandle) -> Result<()> {
     window.set_ignore_cursor_events(true)?;
     window.set_always_on_top(true)?;
     window.show()?;
-    maybe_run_startup_bench(app);
     Ok(())
-}
-
-/// Gancho de instrumentacao da spike: com `PAPAPLAY_SPIKE_BENCH=<n>` o app roda
-/// o benchmark sozinho no boot e grava o JSON em `PAPAPLAY_SPIKE_BENCH_OUT`.
-///
-/// Existe para o numero do relatorio ser reproduzivel por linha de comando, em
-/// vez de depender de alguem clicando o botao. Sai junto com a spike.
-fn maybe_run_startup_bench(app: &AppHandle) {
-    let Ok(raw) = std::env::var("PAPAPLAY_SPIKE_BENCH") else {
-        return;
-    };
-    let Ok(iterations) = raw.trim().parse::<usize>() else {
-        eprintln!("[spike] PAPAPLAY_SPIKE_BENCH invalido: {raw:?}");
-        return;
-    };
-    let app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        // Deixa as janelas assentarem antes de comecar a medir.
-        std::thread::sleep(Duration::from_secs(2));
-        let geometry = match check_geometry(&app) {
-            Ok(check) => Some(check),
-            Err(e) => {
-                eprintln!("[spike] geometria falhou: {e}");
-                None
-            }
-        };
-        let bench = run_bench(&app, iterations.clamp(1, 500));
-        let report = SpikeReport { geometry, bench };
-        let json = serde_json::to_string_pretty(&report)
-            .unwrap_or_else(|e| format!("{{\"erro\":\"{e}\"}}"));
-        match std::env::var("PAPAPLAY_SPIKE_BENCH_OUT") {
-            Ok(path) => {
-                if let Err(e) = std::fs::write(&path, &json) {
-                    eprintln!("[spike] falha ao gravar {path}: {e}");
-                }
-            }
-            Err(_) => println!("{json}"),
-        }
-        eprintln!(
-            "[spike] benchmark concluido: {} iteracoes",
-            report.bench.iterations
-        );
-    });
-}
-
-/// Saida completa do gancho de instrumentacao da spike.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpikeReport {
-    pub geometry: Option<GeometryCheck>,
-    pub bench: BenchReport,
 }
 
 // ---------------------------------------------------------------------------
