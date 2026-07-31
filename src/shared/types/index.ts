@@ -31,6 +31,47 @@ export interface OcrResult {
   capturedAt: string;
 }
 
+/**
+ * Retangulo em pixels **logicos**, relativo ao canto da overlay.
+ *
+ * Ja vem convertido do core: a overlay posiciona direto, sem tocar em escala
+ * de DPI. A conversao mora em `lookup::para_overlay` no Rust.
+ */
+export interface OverlayRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Palavra reconhecida, ja posicionada para desenhar na overlay. */
+export interface LookupWord {
+  text: string;
+  rect: OverlayRect;
+  conf: number;
+  /** Indice da linha em `LookupResult.lines` — de onde sai a frase do card. */
+  lineIndex: number;
+}
+
+export interface LookupLine {
+  text: string;
+  rect: OverlayRect;
+}
+
+/** Resultado de uma consulta: captura + OCR de uma janela em volta do cursor. */
+export interface LookupResult {
+  words: LookupWord[];
+  lines: LookupLine[];
+  /** Cursor em pixels logicos da overlay no instante da captura. */
+  cursor: [number, number] | null;
+  gameName: string | null;
+  /** Recorte lido, em pixels fisicos — diagnostico. */
+  region: { x: number; y: number; width: number; height: number };
+  captureMs: number;
+  ocrMs: number;
+  totalMs: number;
+}
+
 /** Retangulo de um monitor em pixels fisicos da area de trabalho virtual. */
 export interface MonitorRect {
   x: number;

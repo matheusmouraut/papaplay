@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Overlay que transforma jogos em aprendizado de ingles"
 authors = ["PapaPlay"]
 edition = "2021"
+# Com mais de um binario no pacote (ocr-spike, capture-probe) o `cargo run` que
+# o `tauri dev` dispara fica ambiguo e o app nao sobe.
+default-run = "papaplay"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

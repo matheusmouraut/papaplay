@@ -11,6 +11,7 @@
 //!   senao o jogo continua sem receber teclado.
 
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -27,6 +28,18 @@ static INTERACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// Janela que tinha o foco quando entramos em lookup (0 = nenhuma).
 static PREVIOUS_FOREGROUND: AtomicIsize = AtomicIsize::new(0);
+
+/// Alvo congelado no instante em que entramos em lookup.
+///
+/// Em modo lookup **a overlay e a janela em foco**, entao consultar o Windows
+/// durante a consulta devolveria "PapaPlay Overlay" no lugar do nome do jogo.
+/// O alvo certo e o de antes da troca de modo, e e este.
+static LOOKUP_TARGET: Mutex<Option<platform::ForegroundTarget>> = Mutex::new(None);
+
+/// Jogo e monitor de onde a consulta atual deve ler. `None` fora do lookup.
+pub fn lookup_target() -> Option<platform::ForegroundTarget> {
+    LOOKUP_TARGET.lock().ok().and_then(|alvo| alvo.clone())
+}
 
 /// Resultado de uma troca de modo — vai para a UI pelo evento `overlay://mode`.
 #[derive(Debug, Clone, Serialize)]
@@ -97,6 +110,11 @@ pub fn set_mode(app: &AppHandle, interactive: bool) -> Result<ModeChange> {
         let target = platform::foreground_target()?;
         if target.hwnd != own_hwnd(&window) {
             PREVIOUS_FOREGROUND.store(target.hwnd, Ordering::SeqCst);
+            // Alt+X duas vezes seguidas nao pode substituir o jogo pela propria
+            // overlay como alvo da consulta.
+            if let Ok(mut alvo) = LOOKUP_TARGET.lock() {
+                *alvo = Some(target.clone());
+            }
         }
         cover_monitor(&window, target.monitor)?;
         window.set_ignore_cursor_events(false)?;
@@ -110,6 +128,9 @@ pub fn set_mode(app: &AppHandle, interactive: bool) -> Result<ModeChange> {
         // A overlay continua visivel — so para de interceptar o mouse.
         let previous = PREVIOUS_FOREGROUND.swap(0, Ordering::SeqCst);
         platform::restore_foreground(previous);
+        if let Ok(mut alvo) = LOOKUP_TARGET.lock() {
+            *alvo = None;
+        }
     }
 
     // Parte da transicao, entao entra na medicao: o Esc global so pode existir
@@ -143,6 +164,10 @@ pub fn init(app: &AppHandle) -> Result<()> {
     if let Ok(target) = platform::foreground_target() {
         cover_monitor(&window, target.monitor)?;
     }
+    // Tira a overlay da propria captura. Sem isto os destaques de uma consulta
+    // apareceriam como texto na consulta seguinte — o WGC fotografa o monitor
+    // ja composto, com as nossas janelas dentro.
+    platform::exclude_from_capture(own_hwnd(&window));
     window.set_ignore_cursor_events(true)?;
     window.set_always_on_top(true)?;
     window.show()?;

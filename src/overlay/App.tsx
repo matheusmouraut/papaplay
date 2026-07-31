@@ -2,21 +2,28 @@ import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 
 import {
+  lookupRun,
   overlayBench,
   overlaySetMode,
   overlayStatus,
   overlayToggle,
 } from "../shared/api/core";
-import type { OverlayBenchReport, OverlayModeChange } from "../shared/types";
+import type {
+  LookupResult,
+  OverlayBenchReport,
+  OverlayModeChange,
+} from "../shared/types";
+import { WordHighlights } from "./components/WordHighlights";
 
 /**
- * Janela overlay — spike 01 fechada em GO
- * (`docs/spikes/spike-overlay-resultado.md`).
+ * Janela overlay.
  *
- * A UI aqui ainda é instrumentação, não a feature: enquanto estivermos na fase
- * de testes a overlay desenha só as marcas de canto, e o painel de diagnóstico
- * fica escondido atrás do F9. O popup de lookup de verdade (destaques por bbox,
- * tooltip, card) entra na Fase 1 e substitui este arquivo.
+ * Em modo passivo desenha só as marcas de canto. Ao entrar em modo lookup
+ * (Alt+X) dispara uma consulta — captura do entorno do cursor + OCR — e
+ * destaca as palavras encontradas.
+ *
+ * O painel de diagnóstico (F9) sobrou da spike 01 e sai quando o app tiver
+ * uma tela de configurações de verdade.
  */
 
 const BENCH_ITERATIONS = 50;
@@ -63,6 +70,13 @@ export function App() {
   const [bench, setBench] = useState<OverlayBenchReport | null>(null);
   const [benchRunning, setBenchRunning] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [lookup, setLookup] = useState<LookupResult | null>(null);
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+
+  // Derivado, não estado: entre entrar em lookup e o resultado chegar não há
+  // nem resultado nem erro. Um booleano à parte só criaria uma terceira fonte
+  // de verdade para sair de sincronia.
+  const lendo = interactive && lookup === null && erro === null;
 
   // O modo também muda por hotkey (Alt+X / Esc), fora do controle da UI —
   // por isso o estado vem do evento do core, não do retorno do comando.
@@ -78,6 +92,36 @@ export function App() {
       void unlisten.then((off) => off());
     };
   }, []);
+
+  // Entrar em lookup dispara a consulta; sair joga fora o resultado, porque a
+  // tela do jogo já mudou e destaque velho aponta para a palavra errada.
+  useEffect(() => {
+    if (!interactive) return;
+    let cancelado = false;
+    lookupRun()
+      .then((resultado) => {
+        if (!cancelado) setLookup(resultado);
+      })
+      .catch((e: unknown) => {
+        if (!cancelado) setErro(String(e));
+      });
+    return () => {
+      cancelado = true;
+      setLookup(null);
+      setCursor(null);
+      setErro(null);
+    };
+  }, [interactive]);
+
+  // Só em modo lookup: em passivo a janela é click-through e não recebe mouse.
+  useEffect(() => {
+    if (!interactive) return;
+    function onMouseMove(event: MouseEvent) {
+      setCursor({ x: event.clientX, y: event.clientY });
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    return () => window.removeEventListener("mousemove", onMouseMove);
+  }, [interactive]);
 
   // Listener da janela, **não** atalho global: só dispara quando a overlay tem
   // o foco, ou seja, em modo lookup. Em modo passivo o F9 vai para o jogo.
@@ -107,6 +151,22 @@ export function App() {
   return (
     <div className="relative h-full w-full">
       <CornerMarks interactive={interactive} />
+
+      {lookup && <WordHighlights resultado={lookup} cursor={cursor} />}
+
+      {lendo && (
+        <div className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full border border-papa-border bg-black/80 px-4 py-1.5 text-xs text-papa-muted">
+          Lendo a tela…
+        </div>
+      )}
+
+      {/* Erro fica visível sem o F9: a falha mais provável aqui é "modelos de
+          OCR não baixados", e sem aviso a overlay só pareceria não funcionar. */}
+      {interactive && erro && (
+        <div className="absolute left-1/2 top-6 max-w-xl -translate-x-1/2 rounded-lg border border-red-500/50 bg-black/90 px-4 py-2 text-xs text-red-300">
+          {erro}
+        </div>
+      )}
 
       {hudVisible && (
         <div className="absolute left-6 top-6 w-80 rounded-lg border border-papa-border bg-black/80 p-4 text-xs text-papa-text shadow-2xl">
@@ -146,6 +206,29 @@ export function App() {
               valor={mode ? `${mode.scaleFactor}×` : "—"}
             />
           </dl>
+
+          {lookup && (
+            <dl className="mt-3 space-y-1 border-t border-papa-border pt-2">
+              <Linha
+                rotulo="Palavras"
+                valor={`${lookup.words.length} em ${lookup.lines.length} linhas`}
+              />
+              <Linha
+                rotulo="Recorte"
+                valor={`${lookup.region.width}×${lookup.region.height} @ ${lookup.region.x},${lookup.region.y}`}
+              />
+              <Linha
+                rotulo="Captura"
+                valor={`${lookup.captureMs.toFixed(0)} ms`}
+              />
+              <Linha rotulo="OCR" valor={`${lookup.ocrMs.toFixed(0)} ms`} />
+              {/* Orçamento do doc 03: consulta completa < 1 s. */}
+              <Linha
+                rotulo="Consulta"
+                valor={`${lookup.totalMs.toFixed(0)} ms de 1000`}
+              />
+            </dl>
+          )}
 
           <div className="mt-3 flex gap-2">
             <button

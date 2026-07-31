@@ -3,6 +3,7 @@ pub mod deck;
 pub mod dict;
 pub mod error;
 pub mod hotkeys;
+pub mod lookup;
 pub mod ocr;
 pub mod overlay;
 pub mod platform;
@@ -51,6 +52,7 @@ pub fn run() {
             overlay::overlay_check_geometry,
             overlay::overlay_bench,
             overlay::overlay_reset_size,
+            lookup::lookup_run,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

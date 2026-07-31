@@ -122,11 +122,24 @@ pub fn capture_focused_monitor() -> Result<Frame> {
 /// por exemplo) cai no centro do monitor.
 pub fn capture_focused_region(size: (u32, u32), center: Option<(i32, i32)>) -> Result<Frame> {
     let target = platform::foreground_target()?;
+    capture_region_of(&target, size, center)
+}
+
+/// Igual a [`capture_focused_region`], mas num alvo ja conhecido.
+///
+/// E o que a consulta usa: em modo lookup a janela em foco e a **propria
+/// overlay**, entao perguntar ao Windows de novo devolveria o alvo errado. O
+/// alvo bom e o congelado por `overlay::set_mode`.
+pub fn capture_region_of(
+    target: &platform::ForegroundTarget,
+    size: (u32, u32),
+    center: Option<(i32, i32)>,
+) -> Result<Frame> {
     let center = center
         .or_else(platform::cursor_pos)
         .unwrap_or_else(|| centro(target.monitor));
     let regiao = region_around(target.monitor, center, size);
-    grab(&target, regiao)
+    grab(target, regiao)
 }
 
 fn centro(monitor: MonitorRect) -> (i32, i32) {

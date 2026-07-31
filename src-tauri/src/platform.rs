@@ -50,7 +50,7 @@ mod imp {
     use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
     use windows::Win32::UI::WindowsAndMessaging::{
         GetCursorPos, GetForegroundWindow, GetWindowTextLengthW, GetWindowTextW,
-        SetForegroundWindow,
+        SetForegroundWindow, SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
     };
 
     use super::{ForegroundTarget, MonitorRect};
@@ -138,6 +138,21 @@ mod imp {
         })
     }
 
+    /// Some da captura de tela — aplicado **na nossa propria janela**.
+    ///
+    /// Sem isto a overlay entra na foto: o WGC fotografa o monitor composto,
+    /// entao os destaques desenhados numa consulta virariam texto na consulta
+    /// seguinte. Efeito colateral aceito: a overlay tambem some de gravacoes e
+    /// de compartilhamento de tela.
+    pub fn exclude_from_capture(hwnd: isize) -> bool {
+        if hwnd == 0 {
+            return false;
+        }
+        // SAFETY: `hwnd` e uma janela deste processo; a API valida o handle e
+        // devolve FALSE em vez de causar UB.
+        unsafe { SetWindowDisplayAffinity(to_hwnd(hwnd), WDA_EXCLUDEFROMCAPTURE).is_ok() }
+    }
+
     /// Posicao do cursor em coordenadas da area de trabalho virtual.
     pub fn cursor_pos() -> Option<(i32, i32)> {
         let mut point = POINT::default();
@@ -178,9 +193,13 @@ mod imp {
     pub fn cursor_pos() -> Option<(i32, i32)> {
         None
     }
+
+    pub fn exclude_from_capture(_hwnd: isize) -> bool {
+        false
+    }
 }
 
-pub use imp::{cursor_pos, foreground_target, restore_foreground};
+pub use imp::{cursor_pos, exclude_from_capture, foreground_target, restore_foreground};
 
 #[cfg(test)]
 mod tests {

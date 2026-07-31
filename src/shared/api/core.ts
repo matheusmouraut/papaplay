@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import type {
+  LookupResult,
   OverlayBenchReport,
   OverlayModeChange,
   OverlayStatus,
@@ -30,6 +31,17 @@ export function overlayToggle(): Promise<OverlayModeChange> {
 
 export function overlayStatus(): Promise<OverlayStatus> {
   return invoke<OverlayStatus>("overlay_status");
+}
+
+/**
+ * Captura o entorno do cursor e roda o OCR, devolvendo as palavras ja
+ * posicionadas em coordenadas da overlay.
+ *
+ * Bloqueia por centenas de milissegundos: a primeira chamada ainda carrega os
+ * modelos ONNX (~150 ms a mais).
+ */
+export function lookupRun(): Promise<LookupResult> {
+  return invoke<LookupResult>("lookup_run");
 }
 
 /** Executa N alternancias seguidas e devolve as estatisticas de latencia. */
