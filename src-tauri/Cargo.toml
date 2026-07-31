@@ -37,11 +37,27 @@ image = { version = "0.25", default-features = false, features = [
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
 
-# Monitor da janela em foco + restauracao de foco ao sair do modo lookup.
-# Apenas leitura de estado de janelas alheias — nunca injecao (ver CLAUDE.md).
+# Monitor da janela em foco, captura de tela e restauracao de foco ao sair do
+# modo lookup. Apenas leitura de estado de janelas alheias e Windows Graphics
+# Capture — nunca injecao nem hook (ver CLAUDE.md, regra 1).
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [
+  "Foundation",
+  "Graphics_Capture",
+  "Graphics_DirectX_Direct3D11",
   "Win32_Foundation",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
   "Win32_Graphics_Gdi",
+  "Win32_System_Com",
+  # Working set do processo: e assim que o capture-probe mede quanto o runtime
+  # ONNX custa de RAM (divida aberta pela spike 01).
+  "Win32_System_ProcessStatus",
+  "Win32_System_Threading",
+  "Win32_System_WinRT_Direct3D11",
+  "Win32_System_WinRT_Graphics_Capture",
+  "Win32_UI_HiDpi",
   "Win32_UI_WindowsAndMessaging",
 ] }

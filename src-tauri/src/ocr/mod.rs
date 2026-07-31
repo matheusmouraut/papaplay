@@ -370,6 +370,8 @@ mod tests {
         let frame = Frame {
             width: 1,
             height: 1,
+            x: 0,
+            y: 0,
             scale_factor: 1.0,
             window_title: None,
             pixels: vec![10, 20, 30, 255], // B, G, R, A
@@ -383,6 +385,8 @@ mod tests {
         let frame = Frame {
             width: 4,
             height: 4,
+            x: 0,
+            y: 0,
             scale_factor: 1.0,
             window_title: None,
             pixels: vec![0; 8],

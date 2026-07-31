@@ -21,6 +21,9 @@ src-tauri/resources/models/
 # saída visual do `ocr-spike --desenhar`, regerável a partir da fixture
 *.boxes.png
 
+# saída do `capture-probe`: é um retrato da tela do usuário, nunca vai ao repo
+capture-probe*.png
+
 # editor/os
 .vscode/
 .idea/
