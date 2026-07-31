@@ -53,6 +53,7 @@ pub fn run() {
             overlay::overlay_bench,
             overlay::overlay_reset_size,
             lookup::lookup_run,
+            dict::dict_lookup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

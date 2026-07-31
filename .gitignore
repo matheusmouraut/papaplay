@@ -9,8 +9,13 @@ src-tauri/gen/
 
 # db e mídia locais de teste
 *.db
-!src-tauri/resources/dict.db
 media/
+
+# O dict.db (~42 MB) é artefato de build, como os modelos de OCR: sai inteiro de
+# `pnpm run build:dict`. Fora do git porque binário grande no histórico só sai
+# reescrevendo histórico depois.
+# dumps do wiktextract/wordfreq: ~500 MB, também refeitos pelo mesmo comando
+scripts/.cache/
 
 # capturas de tela avulsas das validações manuais (ficam só na máquina)
 imagens/

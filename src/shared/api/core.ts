@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import type {
+  DictEntry,
   LookupResult,
   OverlayBenchReport,
   OverlayModeChange,
@@ -42,6 +43,16 @@ export function overlayStatus(): Promise<OverlayStatus> {
  */
 export function lookupRun(): Promise<LookupResult> {
   return invoke<LookupResult>("lookup_run");
+}
+
+/**
+ * Busca uma palavra no dicionario offline, lematizando antes.
+ *
+ * Aceita a palavra como o OCR entregou — pontuacao e caixa sao normalizadas no
+ * core. `null` quando o dicionario nao conhece a palavra.
+ */
+export function dictLookup(word: string): Promise<DictEntry | null> {
+  return invoke<DictEntry | null>("dict_lookup", { word });
 }
 
 /** Executa N alternancias seguidas e devolve as estatisticas de latencia. */

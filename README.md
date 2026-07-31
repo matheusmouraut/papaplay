@@ -4,10 +4,26 @@ Aprenda inglês jogando. Overlay para Windows: passe o mouse numa palavra no jog
 
 - **Documentação completa:** [`docs/`](docs/README.md)
 - **Instruções para o Claude Code:** [`CLAUDE.md`](CLAUDE.md)
-- **Estado:** pré-scaffold — primeira sessão: `/bootstrap`, depois as spikes em [`docs/spikes/`](docs/spikes/)
+- **Estado:** Fase 0 fechada — as duas spikes deram GO (ver [`docs/spikes/`](docs/spikes/)). Fase 1 em andamento.
+
+## Setup
+
+Dois artefatos ficam fora do git por serem grandes e regeráveis. Sem eles o app sobe, mas a consulta falha com uma mensagem dizendo qual comando rodar.
+
+```powershell
+pnpm install
+powershell -File scripts/fetch-ocr-models.ps1   # modelos de OCR, ~11 MB
+pnpm run build:dict                             # dict.db, ~42 MB (baixa ~500 MB de dumps, só na 1a vez)
+pnpm tauri dev
+```
+
+## Como usar
+
+- **Alt+X** — entra em modo consulta: lê o entorno do cursor e destaca as palavras.
+- **Passar o mouse** numa palavra — tradução curta; **clicar** — acepções, IPA e a frase de contexto.
+- **Esc** — volta ao modo passivo (a overlay continua visível, mas para de interceptar o mouse).
+- **F9** — painel de diagnóstico com as latências de captura e OCR. Sai quando houver tela de configurações.
 
 ## Ordem de desenvolvimento
 
-1. `/bootstrap` — cria o app Tauri 2 + React/TS
-2. `/spike-report overlay` e `/spike-report ocr` — Fase 0, gate antes de qualquer feature
-3. Fase 1 (MVP) na ordem de `docs/05-roadmap.md`
+Fase 1 (MVP) na ordem de [`docs/05-roadmap.md`](docs/05-roadmap.md).

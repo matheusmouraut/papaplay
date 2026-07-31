@@ -31,6 +31,28 @@ export interface OcrResult {
   capturedAt: string;
 }
 
+/** Acepcao de uma palavra no dicionario offline. */
+export interface DictSense {
+  /** Classe gramatical crua do Wiktionary ("noun", "verb", "adj"...). */
+  pos: string;
+  /** Traducoes/definicao em portugues — e o que o tooltip mostra. */
+  glossPt: string;
+  /** Definicao em ingles, quando a fonte tinha uma. */
+  glossEn: string | null;
+  examples: string[];
+}
+
+/** Verbete devolvido por `dict_lookup`. */
+export interface DictEntry {
+  lemma: string;
+  ipa: string | null;
+  senses: DictSense[];
+  /** Posicao na lista de frequencia; menor = mais comum. */
+  freqRank: number | null;
+  /** A forma que estava na tela, quando difere do lema ("ran" para "run"). */
+  matchedForm: string | null;
+}
+
 /**
  * Retangulo em pixels **logicos**, relativo ao canto da overlay.
  *
@@ -107,21 +129,6 @@ export interface OverlayBenchReport {
   p95Us: number;
   failures: number;
   samplesUs: number[];
-}
-
-/** Uma acepcao do dicionario. */
-export interface Sense {
-  pos: string;
-  glossPt: string;
-  glossEn?: string;
-  examples?: string[];
-}
-
-export interface DictEntry {
-  lemma: string;
-  ipa: string | null;
-  senses: Sense[];
-  freqRank: number | null;
 }
 
 export type FsrsState = "new" | "learning" | "review" | "relearning";

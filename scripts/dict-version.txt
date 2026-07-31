@@ -1,0 +1,11 @@
+# Versão dos dumps usados no último build do dict.db.
+# Gerado por scripts/build-dict.mjs — não editar à mão.
+
+data: 2026-07-31T13:39:17.697Z
+en: https://kaikki.org/dictionary/English/kaikki.org-dictionary-English.jsonl
+en_bytes: 497930333
+pt: https://kaikki.org/ptwiktionary/Ingl%C3%AAs/kaikki.org-dictionary-Ingl%C3%AAs.jsonl
+pt_bytes: 1753775
+wordfreq: https://files.pythonhosted.org/packages/24/61/62835c475d69872d30689f284497853fe33fe1d6dd18f57346d13305861d/wordfreq-3.1.1-py3-none-any.whl
+wordfreq_bytes: 1494836
+dict_db_bytes: 44150784

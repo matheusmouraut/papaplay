@@ -20,6 +20,13 @@ pub enum Error {
     #[error("ocr falhou: {0}")]
     Ocr(String),
 
+    /// Falha do dicionario: banco ausente, ilegivel ou consulta malformada.
+    #[error("dicionario falhou: {0}")]
+    Dict(String),
+
+    #[error(transparent)]
+    Sqlite(#[from] rusqlite::Error),
+
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
 

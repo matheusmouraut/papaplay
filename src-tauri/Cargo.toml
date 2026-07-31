@@ -30,6 +30,10 @@ thiserror = "2"
 # OCR (spike 02). `ort` nao tem release estavel — 2.0.0-rc.13 e a versao usada
 # em producao pela comunidade. Pinada em `=` de proposito: as rc mudam a API
 # entre si e um bump silencioso quebraria o build.
+# `bundled` compila o SQLite junto: sem isso o build depende de uma lib do
+# sistema, que no Windows não existe por padrão.
+rusqlite = { version = "0.40", features = ["bundled"] }
+
 ort = "=2.0.0-rc.13"
 image = { version = "0.25", default-features = false, features = [
   "png",
