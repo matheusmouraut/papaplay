@@ -132,6 +132,7 @@ export function WordHighlights({
             erro: erroDaTraducao ? String(erroDaTraducao) : undefined,
           }}
           gameName={resultado.gameName}
+          lookupId={resultado.lookupId}
         />
       )}
     </>
@@ -151,6 +152,7 @@ function Balao({
   frase,
   traducao,
   gameName,
+  lookupId,
 }: {
   palavra: LookupWord;
   expandido: boolean;
@@ -159,6 +161,7 @@ function Balao({
   frase?: string;
   traducao: Traducao;
   gameName: string | null;
+  lookupId: number;
 }) {
   const LARGURA = expandido ? 380 : 300;
   const ALTURA_ESTIMADA = expandido ? 300 : 72;
@@ -185,6 +188,8 @@ function Balao({
           traducao={traducao}
           form={palavra.text}
           gameName={gameName}
+          lookupId={lookupId}
+          lineIndex={palavra.lineIndex}
         />
       ) : (
         <>
@@ -214,6 +219,8 @@ function Verbete({
   traducao,
   form,
   gameName,
+  lookupId,
+  lineIndex,
 }: {
   verbete: DictEntry;
   expandido: boolean;
@@ -222,6 +229,8 @@ function Verbete({
   /** A palavra como estava na tela — é ela que vai para o contexto do card. */
   form: string;
   gameName: string | null;
+  lookupId: number;
+  lineIndex: number;
 }) {
   const acepcoes = acepcoesPrincipais(verbete, MAX_ACEPCOES_VISIVEIS);
   const primeira = acepcoes[0];
@@ -299,6 +308,8 @@ function Verbete({
           sentenceEn={frase}
           sentencePt={traducao.texto ?? null}
           gameName={gameName}
+          lookupId={lookupId}
+          lineIndex={lineIndex}
         />
       )}
 
@@ -319,6 +330,10 @@ function Verbete({
  * A tradução da frase entra no card se já tiver chegado — não vale segurar o
  * salvamento esperando por ela. O card guarda a frase em inglês de todo jeito,
  * e a tradução pode ser reposta depois, na janela principal.
+ *
+ * O `lookupId` + `lineIndex` é o endereço da frase dentro da captura que ainda
+ * está na memória do core: é de lá que sai o recorte do screenshot do card, sem
+ * capturar a tela de novo (que a essa altura já mudou).
  */
 function BotaoSalvar({
   lemma,
@@ -326,12 +341,16 @@ function BotaoSalvar({
   sentenceEn,
   sentencePt,
   gameName,
+  lookupId,
+  lineIndex,
 }: {
   lemma: string;
   form: string;
   sentenceEn: string;
   sentencePt: string | null;
   gameName: string | null;
+  lookupId: number;
+  lineIndex: number;
 }) {
   const { data: card } = useCardStatus(lemma);
   const salvar = useSaveCard();
@@ -348,7 +367,15 @@ function BotaoSalvar({
             : `Salva o card de "${lemma}" com esta frase.`
         }
         onClick={() =>
-          salvar.mutate({ lemma, form, sentenceEn, sentencePt, gameName })
+          salvar.mutate({
+            lemma,
+            form,
+            sentenceEn,
+            sentencePt,
+            gameName,
+            lookupId,
+            lineIndex,
+          })
         }
         className={`w-full rounded px-2 py-1.5 text-sm transition-colors disabled:opacity-50 ${
           salvo

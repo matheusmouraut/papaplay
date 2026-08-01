@@ -13,6 +13,12 @@
 //! mesma operacao, e o `created` da resposta so diz o que aconteceu, para a UI
 //! escolher entre "salvo" e "contexto adicionado".
 //!
+//! # O screenshot
+//!
+//! Cada contexto novo leva um recorte da frase na tela ([`crate::media`]). Ele
+//! e gravado depois do insert, porque o nome do arquivo sai do id do contexto,
+//! e nunca derruba o salvamento: card sem imagem ainda ensina a palavra.
+//!
 //! # Quem calcula o agendamento
 //!
 //! Ninguem, aqui. Regra inviolavel #4: os campos `fsrs_*` chegam prontos do
@@ -59,6 +65,13 @@ pub struct SaveCardInput {
     pub game_name: Option<String>,
     /// So e usado quando o card ainda nao existe.
     pub fsrs: FsrsFields,
+    /// Consulta de onde a frase saiu, para recortar o screenshot dela. Ausente
+    /// quando o salvamento nao veio de um lookup — o card so fica sem imagem.
+    #[serde(default)]
+    pub lookup_id: Option<u64>,
+    /// Linha da consulta em que a frase esta.
+    #[serde(default)]
+    pub line_index: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -72,11 +85,21 @@ pub struct CardSummary {
     pub created: bool,
 }
 
+/// O que aconteceu num salvamento, do ponto de vista de quem chamou.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Salvo {
+    pub resumo: CardSummary,
+    /// Id do contexto inserido agora, ou `None` se a frase ja estava no card.
+    /// E o que diz se vale recortar um screenshot — repetir o clique nao pode
+    /// gerar arquivo novo.
+    pub contexto_novo: Option<i64>,
+}
+
 /// Cria o card (ou anexa um contexto novo se o lema ja existe).
 ///
 /// Salvar a mesma frase duas vezes no mesmo card e engano de clique, nao
 /// contexto novo: o indice unico de `contexts` absorve a repeticao em silencio.
-pub fn save_card(conexao: &Connection, entrada: &SaveCardInput) -> Result<CardSummary> {
+pub fn save_card(conexao: &Connection, entrada: &SaveCardInput) -> Result<Salvo> {
     let lemma = entrada.lemma.trim();
     if lemma.is_empty() {
         return Err(Error::Deck("card sem lema".into()));
@@ -123,7 +146,7 @@ pub fn save_card(conexao: &Connection, entrada: &SaveCardInput) -> Result<CardSu
         }
     };
 
-    conexao.execute(
+    let inseridos = conexao.execute(
         "INSERT OR IGNORE INTO contexts (
              card_id, form, sentence_en, sentence_pt, game_name, captured_at
          ) VALUES (?1, ?2, ?3, ?4, ?5, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
@@ -136,12 +159,31 @@ pub fn save_card(conexao: &Connection, entrada: &SaveCardInput) -> Result<CardSu
         ],
     )?;
 
-    Ok(CardSummary {
-        id: card_id,
-        lemma: lemma.to_string(),
-        contexts: contar_contextos(conexao, card_id)?,
-        created: criado,
+    Ok(Salvo {
+        resumo: CardSummary {
+            id: card_id,
+            lemma: lemma.to_string(),
+            contexts: contar_contextos(conexao, card_id)?,
+            created: criado,
+        },
+        // O `OR IGNORE` faz o insert repetido nao mexer em nada — e por isso
+        // que a contagem de linhas, e nao o `last_insert_rowid`, e quem sabe
+        // se houve contexto novo.
+        contexto_novo: (inseridos == 1).then(|| conexao.last_insert_rowid()),
     })
+}
+
+/// Anexa o screenshot ja gravado em disco ao contexto.
+///
+/// Passo separado do insert porque o nome do arquivo sai do id do contexto: e
+/// o que da um nome unico e rastreavel (`media/ctx-000012.webp`) sem inventar
+/// um uuid nem arriscar dois cards escreverem no mesmo arquivo.
+pub fn set_screenshot(conexao: &Connection, context_id: i64, caminho: &str) -> Result<()> {
+    conexao.execute(
+        "UPDATE contexts SET screenshot_path = ?2 WHERE id = ?1",
+        params![context_id, caminho],
+    )?;
+    Ok(())
 }
 
 /// O card de um lema, se ele ja estiver no deck.
@@ -202,12 +244,40 @@ fn com_conexao<T>(app: &AppHandle, f: impl FnOnce(&Connection) -> Result<T>) -> 
     f(conexao)
 }
 
+/// Recorta e grava o screenshot do contexto, devolvendo o caminho relativo.
+///
+/// `None` em qualquer tropeco — captura ja descartada, disco cheio, consulta
+/// vencida. **Nunca** um erro: perder a imagem e um card mais pobre; perder o
+/// salvamento e o usuario perdendo a palavra que ele acabou de encontrar.
+fn screenshot_do_contexto(
+    app: &AppHandle,
+    entrada: &SaveCardInput,
+    context_id: i64,
+) -> Option<String> {
+    let recorte = crate::lookup::recortar_linha(entrada.lookup_id?, entrada.line_index?)?;
+    match crate::media::salvar(app, &format!("ctx-{context_id:06}"), &recorte) {
+        Ok(caminho) => Some(caminho),
+        Err(erro) => {
+            eprintln!("[deck] contexto {context_id} ficou sem screenshot: {erro}");
+            None
+        }
+    }
+}
+
 /// `async` pelo mesmo motivo do `dict_lookup`: a main thread desenha a overlay
 /// e nao pode esperar disco.
 #[tauri::command]
 pub async fn deck_save_card(app: AppHandle, input: SaveCardInput) -> Result<CardSummary> {
     tauri::async_runtime::spawn_blocking(move || {
-        com_conexao(&app, |conexao| save_card(conexao, &input))
+        com_conexao(&app, |conexao| {
+            let salvo = save_card(conexao, &input)?;
+            if let Some(context_id) = salvo.contexto_novo {
+                if let Some(caminho) = screenshot_do_contexto(&app, &input, context_id) {
+                    set_screenshot(conexao, context_id, &caminho)?;
+                }
+            }
+            Ok(salvo.resumo)
+        })
     })
     .await
     .map_err(|e| Error::Deck(format!("salvamento abortado: {e}")))?
@@ -255,25 +325,33 @@ mod tests {
             sentence_pt: Some("traducao".into()),
             game_name: Some("Skyrim".into()),
             fsrs: fsrs_zerado(),
+            // O recorte depende de uma captura viva no processo; estes testes
+            // exercitam so o banco.
+            lookup_id: None,
+            line_index: None,
         }
     }
 
     #[test]
     fn salvar_cria_o_card_com_um_contexto() {
         let conexao = banco();
-        let resumo = save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
-        assert!(resumo.created);
-        assert_eq!(resumo.lemma, "run");
-        assert_eq!(resumo.contexts, 1);
+        let salvo = save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        assert!(salvo.resumo.created);
+        assert_eq!(salvo.resumo.lemma, "run");
+        assert_eq!(salvo.resumo.contexts, 1);
+        assert!(salvo.contexto_novo.is_some(), "contexto recem-inserido");
     }
 
     #[test]
     fn a_mesma_palavra_em_outra_frase_vira_contexto_do_mesmo_card() {
         // O coracao da decisao "um card por lema": duas flexoes, um card.
         let conexao = banco();
-        let primeiro = save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        let primeiro = save_card(&conexao, &entrada("run", "ran", "He ran away."))
+            .expect("salvou")
+            .resumo;
         let segundo = save_card(&conexao, &entrada("run", "running", "She is running."))
-            .expect("salvou de novo");
+            .expect("salvou de novo")
+            .resumo;
 
         assert_eq!(primeiro.id, segundo.id, "mesmo card");
         assert!(!segundo.created, "o segundo so anexou contexto");
@@ -291,7 +369,31 @@ mod tests {
         save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
         let repetido =
             save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou de novo");
-        assert_eq!(repetido.contexts, 1, "clique repetido nao vira contexto");
+        assert_eq!(
+            repetido.resumo.contexts, 1,
+            "clique repetido nao vira contexto"
+        );
+        assert_eq!(
+            repetido.contexto_novo, None,
+            "sem contexto novo nao ha screenshot novo para gravar"
+        );
+    }
+
+    #[test]
+    fn o_screenshot_entra_no_contexto_recem_criado() {
+        let conexao = banco();
+        let salvo = save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        let contexto = salvo.contexto_novo.expect("contexto novo");
+        set_screenshot(&conexao, contexto, "media/ctx-000001.webp").expect("anexou");
+
+        let caminho: Option<String> = conexao
+            .query_row(
+                "SELECT screenshot_path FROM contexts WHERE id = ?1",
+                [contexto],
+                |l| l.get(0),
+            )
+            .expect("leu o contexto");
+        assert_eq!(caminho.as_deref(), Some("media/ctx-000001.webp"));
     }
 
     #[test]
@@ -360,9 +462,9 @@ mod tests {
     #[test]
     fn apagar_o_card_leva_os_contextos_junto() {
         let conexao = banco();
-        let resumo = save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        let salvo = save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
         conexao
-            .execute("DELETE FROM cards WHERE id = ?1", [resumo.id])
+            .execute("DELETE FROM cards WHERE id = ?1", [salvo.resumo.id])
             .expect("apagou");
         let sobraram: u32 = conexao
             .query_row("SELECT COUNT(*) FROM contexts", [], |l| l.get(0))

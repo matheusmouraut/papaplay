@@ -5,6 +5,7 @@ pub mod dict;
 pub mod error;
 pub mod hotkeys;
 pub mod lookup;
+pub mod media;
 pub mod ocr;
 pub mod overlay;
 pub mod platform;

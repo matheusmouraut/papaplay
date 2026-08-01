@@ -32,6 +32,10 @@ pub enum Error {
     #[error("deck falhou: {0}")]
     Deck(String),
 
+    /// Falha ao recortar ou gravar o screenshot de um contexto.
+    #[error("screenshot falhou: {0}")]
+    Media(String),
+
     #[error(transparent)]
     Sqlite(#[from] rusqlite::Error),
 

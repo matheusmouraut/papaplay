@@ -44,9 +44,13 @@ tokenizers = { version = "0.22", default-features = false, features = [
   "fancy-regex",
 ] }
 
+# O `webp` e o formato dos screenshots dos contextos (docs/04). O encoder do
+# `image` e Rust puro e so faz lossless — o suficiente para um recorte de uma
+# linha de texto, e evita arrastar o libwebp (C) para o build.
 image = { version = "0.25", default-features = false, features = [
   "png",
   "jpeg",
+  "webp",
 ] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

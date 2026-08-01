@@ -16,14 +16,16 @@
 //! O dicionario e a traducao entram depois, consumindo `LookupResult`.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
-use crate::capture::{self, Region, LOOKUP_REGION};
+use crate::capture::{self, Frame, Region, LOOKUP_REGION};
 use crate::error::{Error, Result};
+use crate::media;
 use crate::ocr::{self, BBox, Engine};
 use crate::overlay;
 use crate::platform::{self, MonitorRect};
@@ -35,6 +37,29 @@ const MODELS_ENV: &str = "PAPAPLAY_OCR_MODELS";
 /// troca de RAM, toda consulta depois da primeira paga so a inferencia.
 /// (A traducao NMT tera a politica oposta — ver `translate::unload_model`.)
 static ENGINE: Mutex<Option<Engine>> = Mutex::new(None);
+
+/// Frame da consulta atual, guardado inteiro para poder recortar o screenshot
+/// do card sem capturar a tela de novo — no instante do clique em "salvar" o
+/// jogo ja avancou e a frase pode nem estar mais la.
+///
+/// Custa ~3,5 MB (1280x720 BGRA) e vive so enquanto o modo lookup esta ligado:
+/// [`forget_capture`] o solta ao voltar para o passivo, junto com o tradutor.
+static ULTIMA_CAPTURA: Mutex<Option<Captura>> = Mutex::new(None);
+
+/// Identifica a consulta. Serve para o salvamento provar que o recorte que ele
+/// quer e da tela que o usuario esta vendo, e nao de uma consulta posterior.
+static PROXIMO_ID: AtomicU64 = AtomicU64::new(1);
+
+struct Captura {
+    id: u64,
+    width: u32,
+    height: u32,
+    /// Pixels BGRA do recorte capturado.
+    pixels: Vec<u8>,
+    /// Caixa de cada linha reconhecida, em pixels **do frame** — nao as da
+    /// overlay: recorte se faz na imagem, nao na tela.
+    lines: Vec<BBox>,
+}
 
 /// Retangulo em pixels **logicos**, relativo ao canto da overlay — pronto para
 /// virar `style="left: {x}px; top: {y}px"` sem mais nenhuma conversao.
@@ -75,6 +100,9 @@ pub struct LookupLine {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LookupResult {
+    /// Identificador desta consulta. Volta em `deck_save_card` para dizer de
+    /// qual captura sai o screenshot do contexto.
+    pub lookup_id: u64,
     pub words: Vec<LookupWord>,
     pub lines: Vec<LookupLine>,
     /// Cursor em pixels logicos da overlay, para saber qual palavra esta sob
@@ -167,6 +195,19 @@ pub fn run(app: &AppHandle) -> Result<LookupResult> {
     let origem = (frame.x, frame.y);
     let escala = target.scale_factor;
     let monitor = target.monitor;
+    let region = Region {
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
+    };
+
+    // Antes de mapear para a overlay: o recorte do screenshot precisa das
+    // caixas no sistema de coordenadas da imagem.
+    let lookup_id = guardar_captura(
+        frame,
+        resultado.lines.iter().map(|linha| linha.bbox).collect(),
+    );
 
     let words = resultado
         .words
@@ -196,16 +237,12 @@ pub fn run(app: &AppHandle) -> Result<LookupResult> {
     });
 
     Ok(LookupResult {
+        lookup_id,
         words,
         lines,
         cursor,
         game_name: target.window_title,
-        region: Region {
-            x: frame.x,
-            y: frame.y,
-            width: frame.width,
-            height: frame.height,
-        },
+        region,
         capture_ms,
         ocr_ms,
         total_ms: ms(comeco),
@@ -214,6 +251,55 @@ pub fn run(app: &AppHandle) -> Result<LookupResult> {
 
 fn ms(desde: Instant) -> f64 {
     desde.elapsed().as_secs_f64() * 1000.0
+}
+
+/// Guarda o frame da consulta e devolve o id dela.
+///
+/// Substitui a captura anterior: so a tela que o usuario esta vendo interessa,
+/// e manter as antigas seria acumular megabytes por Alt+X.
+fn guardar_captura(frame: Frame, lines: Vec<BBox>) -> u64 {
+    let id = PROXIMO_ID.fetch_add(1, Ordering::Relaxed);
+    if let Ok(mut guarda) = ULTIMA_CAPTURA.lock() {
+        *guarda = Some(Captura {
+            id,
+            width: frame.width,
+            height: frame.height,
+            pixels: frame.pixels,
+            lines,
+        });
+    }
+    id
+}
+
+/// Recorta a linha `line_index` da captura `lookup_id` — o screenshot que vai
+/// para o contexto do card.
+///
+/// `None` quando a captura ja foi descartada ou quando outra consulta rodou no
+/// meio: card sem imagem e um card incompleto, mas card com a imagem de outra
+/// tela e um card errado.
+pub fn recortar_linha(lookup_id: u64, line_index: usize) -> Option<media::Recorte> {
+    let guarda = ULTIMA_CAPTURA.lock().ok()?;
+    let captura = guarda.as_ref()?;
+    if captura.id != lookup_id {
+        return None;
+    }
+    let area = *captura.lines.get(line_index)?;
+    media::recortar(
+        &media::Bgra {
+            width: captura.width,
+            height: captura.height,
+            pixels: &captura.pixels,
+        },
+        area,
+        media::MARGEM,
+    )
+}
+
+/// Solta o frame da ultima consulta. Chamado ao sair do modo lookup.
+pub fn forget_capture() {
+    if let Ok(mut guarda) = ULTIMA_CAPTURA.lock() {
+        *guarda = None;
+    }
 }
 
 /// Descarrega os modelos de OCR. Existe para a tela de configuracoes poder
@@ -305,6 +391,34 @@ mod tests {
         let r = para_overlay(bbox(10, 10, 10, 10), (0, 0), monitor(), 0.0);
         assert!(r.x.is_finite() && r.w.is_finite(), "{r:?}");
         assert_eq!(r.w, 10.0, "escala invalida cai em 1.0");
+    }
+
+    /// Um so teste mexe na captura guardada: ela e um estatico do processo e
+    /// dois testes paralelos brigariam por ela.
+    #[test]
+    fn o_recorte_sai_da_captura_da_propria_consulta() {
+        let frame = Frame {
+            width: 200,
+            height: 100,
+            x: 0,
+            y: 0,
+            scale_factor: 1.0,
+            window_title: None,
+            pixels: vec![255u8; 200 * 100 * 4],
+        };
+        let id = guardar_captura(frame, vec![bbox(80, 40, 40, 12)]);
+
+        let recorte = recortar_linha(id, 0).expect("recortou a linha 0");
+        assert_eq!(recorte.width, 40 + media::MARGEM.0 * 2, "linha mais margem");
+        assert_eq!(recorte.height, 12 + media::MARGEM.1 * 2);
+
+        assert!(recortar_linha(id, 7).is_none(), "linha que nao existe");
+        // O caso que o id existe para pegar: o usuario deu Alt+X de novo antes
+        // de clicar em salvar, e o recorte viria da tela errada.
+        assert!(recortar_linha(id + 1, 0).is_none(), "outra consulta");
+
+        forget_capture();
+        assert!(recortar_linha(id, 0).is_none(), "captura ja descartada");
     }
 
     #[test]

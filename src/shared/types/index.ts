@@ -82,6 +82,13 @@ export interface LookupLine {
 
 /** Resultado de uma consulta: captura + OCR de uma janela em volta do cursor. */
 export interface LookupResult {
+  /**
+   * Identificador desta consulta.
+   *
+   * Volta em `SaveCardInput` para o core saber de qual captura recortar o
+   * screenshot — e para recusar o recorte se outra consulta rodou no meio.
+   */
+  lookupId: number;
   words: LookupWord[];
   lines: LookupLine[];
   /** Cursor em pixels logicos da overlay no instante da captura. */
@@ -178,6 +185,10 @@ export interface SaveCardInput {
   gameName: string | null;
   /** So e usado quando o card ainda nao existe. */
   fsrs: FsrsFields;
+  /** Consulta de onde a frase saiu — sem ela o card fica sem screenshot. */
+  lookupId?: number;
+  /** Indice da linha da frase dentro daquela consulta. */
+  lineIndex?: number;
 }
 
 /** Card visto de fora: o suficiente para o botao da overlay se orientar. */

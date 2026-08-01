@@ -129,6 +129,9 @@ pub fn set_mode(app: &AppHandle, interactive: bool) -> Result<ModeChange> {
         // frase tao cedo: e aqui que os ~350 MB do tradutor voltam para o jogo
         // (ver `translate::unload_model`). O OCR, ao contrario, fica.
         crate::translate::unload_model();
+        // Junto com ele vai o frame da ultima consulta (~3,5 MB): sem modo
+        // lookup nao ha mais o que salvar no deck a partir dele.
+        crate::lookup::forget_capture();
         // A overlay continua visivel — so para de interceptar o mouse.
         let previous = PREVIOUS_FOREGROUND.swap(0, Ordering::SeqCst);
         platform::restore_foreground(previous);
