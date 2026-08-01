@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./theme.css";
 
 /* A janela overlay precisa ser totalmente transparente: nada de background
    herdado do reset do Tailwind, senao o click-through fica visivel. */

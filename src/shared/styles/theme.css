@@ -1,0 +1,16 @@
+/* Paleta compartilhada pelas duas janelas.
+ *
+ * Fica num arquivo próprio porque o Tailwind resolve `@theme` por folha de
+ * estilo: uma cor definida só no `index.css` simplesmente não existe na
+ * overlay, e classes como `text-papa-text` viram nada — texto preto sobre
+ * fundo preto, sem erro nenhum no build. Foi o que aconteceu até aqui.
+ *
+ * Qualquer cor nova do produto entra aqui, não nas folhas das janelas. */
+@theme {
+  --color-papa-bg: #0f1117;
+  --color-papa-surface: #171a23;
+  --color-papa-border: #262b38;
+  --color-papa-accent: #6ee7b7;
+  --color-papa-text: #e6e8ef;
+  --color-papa-muted: #8b93a7;
+}
