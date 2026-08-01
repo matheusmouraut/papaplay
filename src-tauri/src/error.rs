@@ -28,6 +28,10 @@ pub enum Error {
     #[error("traducao falhou: {0}")]
     Translate(String),
 
+    /// Falha do deck: banco do usuario inacessivel, migration ou consulta.
+    #[error("deck falhou: {0}")]
+    Deck(String),
+
     #[error(transparent)]
     Sqlite(#[from] rusqlite::Error),
 

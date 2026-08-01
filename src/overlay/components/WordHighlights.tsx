@@ -5,6 +5,7 @@ import {
   classeEmPtBr,
   frequenciaDe,
 } from "../../shared/dict/apresentacao";
+import { useCardStatus, useSaveCard } from "../../shared/hooks/useDeckCard";
 import { useDictEntry } from "../../shared/hooks/useDictEntry";
 import { useSentenceTranslation } from "../../shared/hooks/useSentenceTranslation";
 import type { DictEntry, LookupResult, LookupWord } from "../../shared/types";
@@ -130,6 +131,7 @@ export function WordHighlights({
             carregando: traduzindo,
             erro: erroDaTraducao ? String(erroDaTraducao) : undefined,
           }}
+          gameName={resultado.gameName}
         />
       )}
     </>
@@ -148,6 +150,7 @@ function Balao({
   carregando,
   frase,
   traducao,
+  gameName,
 }: {
   palavra: LookupWord;
   expandido: boolean;
@@ -155,6 +158,7 @@ function Balao({
   carregando: boolean;
   frase?: string;
   traducao: Traducao;
+  gameName: string | null;
 }) {
   const LARGURA = expandido ? 380 : 300;
   const ALTURA_ESTIMADA = expandido ? 300 : 72;
@@ -179,6 +183,8 @@ function Balao({
           expandido={expandido}
           frase={frase}
           traducao={traducao}
+          form={palavra.text}
+          gameName={gameName}
         />
       ) : (
         <>
@@ -206,11 +212,16 @@ function Verbete({
   expandido,
   frase,
   traducao,
+  form,
+  gameName,
 }: {
   verbete: DictEntry;
   expandido: boolean;
   frase?: string;
   traducao: Traducao;
+  /** A palavra como estava na tela — é ela que vai para o contexto do card. */
+  form: string;
+  gameName: string | null;
 }) {
   const acepcoes = acepcoesPrincipais(verbete, MAX_ACEPCOES_VISIVEIS);
   const primeira = acepcoes[0];
@@ -278,10 +289,17 @@ function Verbete({
                 ) : null)}
             </p>
           )}
-          <p className="mt-1 text-[11px] text-papa-muted/70">
-            Salvar no deck entra na próxima etapa.
-          </p>
         </div>
+      )}
+
+      {expandido && frase && (
+        <BotaoSalvar
+          lemma={verbete.lemma}
+          form={form}
+          sentenceEn={frase}
+          sentencePt={traducao.texto ?? null}
+          gameName={gameName}
+        />
       )}
 
       {!expandido && (
@@ -290,5 +308,64 @@ function Verbete({
         </p>
       )}
     </>
+  );
+}
+
+/**
+ * Salvar no deck. Um card por lema: reencontrar a mesma palavra em outra frase
+ * anexa contexto ao card que já existe, e é por isso que o botão continua
+ * clicável depois de salvo.
+ *
+ * A tradução da frase entra no card se já tiver chegado — não vale segurar o
+ * salvamento esperando por ela. O card guarda a frase em inglês de todo jeito,
+ * e a tradução pode ser reposta depois, na janela principal.
+ */
+function BotaoSalvar({
+  lemma,
+  form,
+  sentenceEn,
+  sentencePt,
+  gameName,
+}: {
+  lemma: string;
+  form: string;
+  sentenceEn: string;
+  sentencePt: string | null;
+  gameName: string | null;
+}) {
+  const { data: card } = useCardStatus(lemma);
+  const salvar = useSaveCard();
+  const salvo = card !== null && card !== undefined;
+
+  return (
+    <div className="mt-3 border-t border-papa-border pt-2">
+      <button
+        type="button"
+        disabled={salvar.isPending}
+        title={
+          salvo
+            ? "Já está no deck. Clique para anexar esta frase ao card."
+            : `Salva o card de "${lemma}" com esta frase.`
+        }
+        onClick={() =>
+          salvar.mutate({ lemma, form, sentenceEn, sentencePt, gameName })
+        }
+        className={`w-full rounded px-2 py-1.5 text-sm transition-colors disabled:opacity-50 ${
+          salvo
+            ? "border border-papa-accent/50 bg-papa-accent/10 text-papa-accent"
+            : "border border-papa-border text-papa-text hover:bg-white/5"
+        }`}
+      >
+        {salvar.isPending
+          ? "Salvando…"
+          : salvo
+            ? `★ No deck · ${card.contexts} ${card.contexts === 1 ? "contexto" : "contextos"}`
+            : "☆ Salvar no deck"}
+      </button>
+
+      {salvar.isError && (
+        <p className="mt-1 text-[11px] text-red-300">{String(salvar.error)}</p>
+      )}
+    </div>
   );
 }

@@ -133,6 +133,24 @@ export interface OverlayBenchReport {
 
 export type FsrsState = "new" | "learning" | "review" | "relearning";
 
+/**
+ * Estado do FSRS no formato que o core persiste.
+ *
+ * So `src/shared/srs` produz um destes (regra inviolavel #4): o Rust grava o
+ * que recebe, sem calcular agendamento.
+ */
+export interface FsrsFields {
+  due: string;
+  stability: number;
+  difficulty: number;
+  state: FsrsState;
+  reps: number;
+  lapses: number;
+  scheduledDays: number;
+  learningSteps: number;
+  lastReview: string | null;
+}
+
 /** Card do deck. Os campos `fsrs*` so devem ser alterados via `src/shared/srs`. */
 export interface DeckCard {
   id: number;
@@ -145,6 +163,31 @@ export interface DeckCard {
   fsrsState: FsrsState;
   fsrsReps: number;
   fsrsLapses: number;
+  fsrsScheduledDays: number;
+  fsrsLearningSteps: number;
+  fsrsLastReview: string | null;
+}
+
+/** Payload de "salvar no deck" — o que o overlay manda ao core. */
+export interface SaveCardInput {
+  lemma: string;
+  /** A forma como estava na tela ("ran"), nao o lema. */
+  form: string;
+  sentenceEn: string;
+  sentencePt: string | null;
+  gameName: string | null;
+  /** So e usado quando o card ainda nao existe. */
+  fsrs: FsrsFields;
+}
+
+/** Card visto de fora: o suficiente para o botao da overlay se orientar. */
+export interface CardSummary {
+  id: number;
+  lemma: string;
+  /** Quantas vezes a palavra ja foi encontrada e salva. */
+  contexts: number;
+  /** `true` se este salvamento criou o card; `false` se so anexou contexto. */
+  created: boolean;
 }
 
 /** Ocorrencia da palavra num jogo, anexada a um card. */

@@ -16,7 +16,7 @@ import {
   type RecordLogItem,
 } from "ts-fsrs";
 
-import type { DeckCard, FsrsState } from "../types";
+import type { DeckCard, FsrsFields, FsrsState } from "../types";
 
 export { Rating, State };
 export type { FsrsCard, Grade, RecordLogItem };
@@ -63,6 +63,31 @@ export function newCard(now: Date = new Date()): FsrsCard {
   return createEmptyCard(now);
 }
 
+/**
+ * Estado inicial de uma palavra salva no overlay, pronto para o `deck_save_card`.
+ *
+ * Existe para que o core nunca precise inventar um estado zerado por conta
+ * propria: "card novo" e uma definicao do FSRS, e ela mora aqui.
+ */
+export function newCardFields(now: Date = new Date()): FsrsFields {
+  return toFsrsFields(createEmptyCard(now));
+}
+
+/** Converte um card do ts-fsrs para o formato que o core persiste. */
+export function toFsrsFields(card: FsrsCard): FsrsFields {
+  return {
+    due: card.due.toISOString(),
+    stability: card.stability,
+    difficulty: card.difficulty,
+    state: STATE_TO_STRING[card.state],
+    reps: card.reps,
+    lapses: card.lapses,
+    scheduledDays: card.scheduled_days,
+    learningSteps: card.learning_steps,
+    lastReview: card.last_review ? card.last_review.toISOString() : null,
+  };
+}
+
 /** Previa dos 4 intervalos possiveis, para mostrar nos botoes de revisao. */
 export function preview(card: FsrsCard, now: Date = new Date()) {
   return scheduler.repeat(card, now);
@@ -85,9 +110,10 @@ export function retrievability(card: FsrsCard, now: Date = new Date()): number {
 /**
  * Converte o card persistido no SQLite para o formato do ts-fsrs.
  *
- * TODO(schema): `scheduled_days`, `learning_steps` e `last_review` ainda nao
- * existem em `cards` (ver docs/04). Sao reconstruidos com valores neutros ate
- * a migration que os adiciona — o agendamento de curto prazo fica aproximado.
+ * `elapsed_days` nao e persistido de proposito: e a distancia entre a ultima
+ * revisao e agora, ou seja, muda sozinho com o tempo. O proprio ts-fsrs o
+ * recalcula a cada `repeat`/`next`, entao guardar seria guardar uma copia que
+ * envelhece.
  */
 export function toFsrsCard(card: DeckCard): FsrsCard {
   return {
@@ -95,23 +121,30 @@ export function toFsrsCard(card: DeckCard): FsrsCard {
     stability: card.fsrsStability,
     difficulty: card.fsrsDifficulty,
     elapsed_days: 0,
-    scheduled_days: 0,
-    learning_steps: 0,
+    scheduled_days: card.fsrsScheduledDays,
+    learning_steps: card.fsrsLearningSteps,
     reps: card.fsrsReps,
     lapses: card.fsrsLapses,
     state: STRING_TO_STATE[card.fsrsState],
+    last_review: card.fsrsLastReview
+      ? new Date(card.fsrsLastReview)
+      : undefined,
   };
 }
 
 /** Aplica um card do ts-fsrs de volta sobre o registro persistido. */
 export function fromFsrsCard(card: DeckCard, next: FsrsCard): DeckCard {
+  const campos = toFsrsFields(next);
   return {
     ...card,
-    fsrsDue: next.due.toISOString(),
-    fsrsStability: next.stability,
-    fsrsDifficulty: next.difficulty,
-    fsrsState: STATE_TO_STRING[next.state],
-    fsrsReps: next.reps,
-    fsrsLapses: next.lapses,
+    fsrsDue: campos.due,
+    fsrsStability: campos.stability,
+    fsrsDifficulty: campos.difficulty,
+    fsrsState: campos.state,
+    fsrsReps: campos.reps,
+    fsrsLapses: campos.lapses,
+    fsrsScheduledDays: campos.scheduledDays,
+    fsrsLearningSteps: campos.learningSteps,
+    fsrsLastReview: campos.lastReview,
   };
 }

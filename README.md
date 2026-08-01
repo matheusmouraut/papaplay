@@ -8,7 +8,7 @@ Aprenda inglês jogando. Overlay para Windows: passe o mouse numa palavra no jog
 
 ## Setup
 
-Três artefatos ficam fora do git por serem grandes e regeráveis. Sem eles o app sobe, mas a consulta falha com uma mensagem dizendo qual comando rodar.
+Três artefatos ficam fora do git por serem grandes e regeráveis. Sem eles o app sobe, mas a consulta falha com uma mensagem dizendo qual comando rodar. O deck (`%APPDATA%/papaplay/papaplay.db`) não está nessa lista: ele é criado e migrado sozinho no primeiro salvamento.
 
 ```powershell
 pnpm install
@@ -21,7 +21,7 @@ pnpm tauri dev
 ## Como usar
 
 - **Alt+X** — entra em modo consulta: lê o entorno do cursor e destaca as palavras.
-- **Passar o mouse** numa palavra — tradução curta; **clicar** — acepções, IPA, a frase de contexto e a tradução dela.
+- **Passar o mouse** numa palavra — tradução curta; **clicar** — acepções, IPA, a frase de contexto, a tradução dela e o botão de salvar no deck.
 - **Esc** — volta ao modo passivo (a overlay continua visível, mas para de interceptar o mouse).
 - **F9** — painel de diagnóstico com as latências de captura e OCR. Sai quando houver tela de configurações.
 

@@ -1,11 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import type {
+  CardSummary,
   DictEntry,
   LookupResult,
   OverlayBenchReport,
   OverlayModeChange,
   OverlayStatus,
+  SaveCardInput,
 } from "../types";
 
 /**
@@ -65,6 +67,21 @@ export function dictLookup(word: string): Promise<DictEntry | null> {
  */
 export function translateRun(text: string): Promise<string> {
   return invoke<string>("translate_run", { text });
+}
+
+/**
+ * Salva a palavra no deck, ou anexa mais um contexto se ela ja estiver la.
+ *
+ * O `input.fsrs` tem que vir de `newCardFields()` — o core grava esses campos
+ * sem calcular nada (regra inviolavel #4).
+ */
+export function deckSaveCard(input: SaveCardInput): Promise<CardSummary> {
+  return invoke<CardSummary>("deck_save_card", { input });
+}
+
+/** O card de um lema, ou `null` se a palavra ainda nao esta no deck. */
+export function deckCardStatus(lemma: string): Promise<CardSummary | null> {
+  return invoke<CardSummary | null>("deck_card_status", { lemma });
 }
 
 /** Executa N alternancias seguidas e devolve as estatisticas de latencia. */

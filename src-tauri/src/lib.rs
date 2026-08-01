@@ -1,4 +1,5 @@
 pub mod capture;
+pub mod db;
 pub mod deck;
 pub mod dict;
 pub mod error;
@@ -55,6 +56,8 @@ pub fn run() {
             lookup::lookup_run,
             dict::dict_lookup,
             translate::translate_run,
+            deck::deck_save_card,
+            deck::deck_card_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
