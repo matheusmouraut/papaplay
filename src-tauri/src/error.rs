@@ -24,6 +24,10 @@ pub enum Error {
     #[error("dicionario falhou: {0}")]
     Dict(String),
 
+    /// Falha da traducao de frases: modelo ausente, carga ou inferencia.
+    #[error("traducao falhou: {0}")]
+    Translate(String),
+
     #[error(transparent)]
     Sqlite(#[from] rusqlite::Error),
 

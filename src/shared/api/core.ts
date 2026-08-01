@@ -55,6 +55,18 @@ export function dictLookup(word: string): Promise<DictEntry | null> {
   return invoke<DictEntry | null>("dict_lookup", { word });
 }
 
+/**
+ * Traduz uma frase de ingles para portugues do Brasil, offline.
+ *
+ * Bloqueia por dezenas de milissegundos por frase, mais ~800 ms na primeira
+ * chamada de cada sessao de lookup — que e quando o modelo entra na memoria.
+ * Ele sai dela ao voltar para o modo passivo (`translate::unload_model`), entao
+ * essa carga reaparece a cada Alt+X.
+ */
+export function translateRun(text: string): Promise<string> {
+  return invoke<string>("translate_run", { text });
+}
+
 /** Executa N alternancias seguidas e devolve as estatisticas de latencia. */
 export function overlayBench(iterations: number): Promise<OverlayBenchReport> {
   return invoke<OverlayBenchReport>("overlay_bench", { iterations });

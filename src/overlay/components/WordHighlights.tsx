@@ -6,6 +6,7 @@ import {
   frequenciaDe,
 } from "../../shared/dict/apresentacao";
 import { useDictEntry } from "../../shared/hooks/useDictEntry";
+import { useSentenceTranslation } from "../../shared/hooks/useSentenceTranslation";
 import type { DictEntry, LookupResult, LookupWord } from "../../shared/types";
 
 /**
@@ -17,8 +18,8 @@ import type { DictEntry, LookupResult, LookupWord } from "../../shared/types";
  * posicionamento. Se um destaque sair torto, o bug está no Rust, não aqui.
  *
  * Dois níveis, como a F3 pede: passar o mouse mostra a linha curta
- * (`palavra → tradução (classe)`); clicar abre as acepções, o IPA e a frase de
- * contexto. A tradução da frase entra quando o motor NMT existir.
+ * (`palavra → tradução (classe)`); clicar abre as acepções, o IPA, a frase de
+ * contexto e a tradução dela.
  */
 
 /** Palavras com confiança abaixo disto viram ruído visual — não desenhamos. */
@@ -89,6 +90,14 @@ export function WordHighlights({
 
   const frase = ativa ? resultado.lines[ativa.lineIndex]?.text : undefined;
 
+  // Só a palavra fixada por clique traduz a frase: no hover o custo estoura o
+  // orçamento do tooltip (ver `useSentenceTranslation`).
+  const {
+    data: traducao,
+    isFetching: traduzindo,
+    error: erroDaTraducao,
+  } = useSentenceTranslation(fixada && frase ? frase : null);
+
   return (
     <>
       {visiveis.map((palavra, i) => (
@@ -116,6 +125,11 @@ export function WordHighlights({
           verbete={verbete ?? null}
           carregando={consultada === null || isFetching}
           frase={frase}
+          traducao={{
+            texto: traducao,
+            carregando: traduzindo,
+            erro: erroDaTraducao ? String(erroDaTraducao) : undefined,
+          }}
         />
       )}
     </>
@@ -133,15 +147,17 @@ function Balao({
   verbete,
   carregando,
   frase,
+  traducao,
 }: {
   palavra: LookupWord;
   expandido: boolean;
   verbete: DictEntry | null;
   carregando: boolean;
   frase?: string;
+  traducao: Traducao;
 }) {
   const LARGURA = expandido ? 380 : 300;
-  const ALTURA_ESTIMADA = expandido ? 260 : 72;
+  const ALTURA_ESTIMADA = expandido ? 300 : 72;
   const MARGEM = 8;
 
   const abaixo = palavra.rect.y + palavra.rect.h + MARGEM;
@@ -158,7 +174,12 @@ function Balao({
       style={{ left, top, width: LARGURA }}
     >
       {verbete ? (
-        <Verbete verbete={verbete} expandido={expandido} frase={frase} />
+        <Verbete
+          verbete={verbete}
+          expandido={expandido}
+          frase={frase}
+          traducao={traducao}
+        />
       ) : (
         <>
           <p className="text-base font-semibold text-papa-text">
@@ -173,14 +194,23 @@ function Balao({
   );
 }
 
+/** Estado da tradução da frase de contexto, do ponto de vista do balão. */
+type Traducao = {
+  texto?: string;
+  carregando: boolean;
+  erro?: string;
+};
+
 function Verbete({
   verbete,
   expandido,
   frase,
+  traducao,
 }: {
   verbete: DictEntry;
   expandido: boolean;
   frase?: string;
+  traducao: Traducao;
 }) {
   const acepcoes = acepcoesPrincipais(verbete, MAX_ACEPCOES_VISIVEIS);
   const primeira = acepcoes[0];
@@ -236,8 +266,20 @@ function Verbete({
       {expandido && frase && (
         <div className="mt-3 border-t border-papa-border pt-2">
           <p className="text-xs text-papa-muted">{frase}</p>
+          {/* A frase original fica acima da tradução de propósito: quem está
+              aprendendo lê o inglês primeiro e usa o português como conferência. */}
+          {traducao.erro ? (
+            <p className="mt-1 text-[11px] text-red-300">{traducao.erro}</p>
+          ) : (
+            <p className="mt-1 text-sm text-papa-text">
+              {traducao.texto ??
+                (traducao.carregando ? (
+                  <span className="text-papa-muted">Traduzindo…</span>
+                ) : null)}
+            </p>
+          )}
           <p className="mt-1 text-[11px] text-papa-muted/70">
-            Tradução da frase e salvar no deck entram nas próximas etapas.
+            Salvar no deck entra na próxima etapa.
           </p>
         </div>
       )}

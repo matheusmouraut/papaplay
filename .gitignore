@@ -23,6 +23,9 @@ imagens/
 # modelos de OCR: 11 MB de binário, refeitos por scripts/fetch-ocr-models.ps1
 src-tauri/resources/models/
 
+# modelos de tradução: ~350 MB, refeitos por scripts/export-nmt.ps1
+src-tauri/resources/nmt/
+
 # saída visual do `ocr-spike --desenhar`, regerável a partir da fixture
 *.boxes.png
 

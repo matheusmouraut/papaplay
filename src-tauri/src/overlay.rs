@@ -125,6 +125,10 @@ pub fn set_mode(app: &AppHandle, interactive: bool) -> Result<ModeChange> {
         monitor = Some(target.monitor);
     } else {
         window.set_ignore_cursor_events(true)?;
+        // Sair do lookup e o unico momento em que se sabe que nao havera outra
+        // frase tao cedo: e aqui que os ~350 MB do tradutor voltam para o jogo
+        // (ver `translate::unload_model`). O OCR, ao contrario, fica.
+        crate::translate::unload_model();
         // A overlay continua visivel — so para de interceptar o mouse.
         let previous = PREVIOUS_FOREGROUND.swap(0, Ordering::SeqCst);
         platform::restore_foreground(previous);

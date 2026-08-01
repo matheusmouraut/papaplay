@@ -35,6 +35,15 @@ thiserror = "2"
 rusqlite = { version = "0.40", features = ["bundled"] }
 
 ort = "=2.0.0-rc.13"
+
+# Tokenizador do tradutor. `default-features = false` tira o oniguruma (C) e a
+# barra de progresso: o Marian usa Unigram + Metaspace, que sao Rust puro.
+# O `fancy-regex` nao e opcional — a crate exige um backend de regex e este e o
+# que dispensa o oniguruma.
+tokenizers = { version = "0.22", default-features = false, features = [
+  "fancy-regex",
+] }
+
 image = { version = "0.25", default-features = false, features = [
   "png",
   "jpeg",
