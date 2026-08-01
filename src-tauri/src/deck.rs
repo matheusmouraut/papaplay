@@ -220,6 +220,292 @@ pub fn due_cards(_conexao: &Connection, _limit: u32) -> Result<Vec<CardSummary>>
     Err(Error::NotImplemented("deck::due_cards"))
 }
 
+// ---------------------------------------------------------------------------
+// Gestao do deck (F4)
+// ---------------------------------------------------------------------------
+
+/// Card como a lista da tela Deck o mostra: o estado do card mais o contexto
+/// mais recente, que e o que faz reconhecer a palavra sem abrir o detalhe.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRow {
+    pub id: i64,
+    pub lemma: String,
+    pub created_at: String,
+    pub suspended: bool,
+    pub fsrs_due: String,
+    pub fsrs_state: String,
+    pub fsrs_reps: u32,
+    pub fsrs_lapses: u32,
+    pub contexts: u32,
+    pub last_sentence: Option<String>,
+    pub last_game: Option<String>,
+}
+
+/// Ocorrencia da palavra num jogo.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardContext {
+    pub id: i64,
+    pub card_id: i64,
+    pub form: String,
+    pub sentence_en: String,
+    pub sentence_pt: Option<String>,
+    pub game_name: Option<String>,
+    /// Caminho relativo (`media/ctx-000012.webp`), lido por `deck_screenshot`.
+    pub screenshot_path: Option<String>,
+    pub captured_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardDetail {
+    pub card: CardRow,
+    pub contexts: Vec<CardContext>,
+}
+
+/// Como ordenar a lista.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Ordem {
+    /// Ultimos salvos primeiro — o que quase sempre e o que se procura.
+    #[default]
+    Recentes,
+    Alfabetica,
+    /// Proximos do vencimento primeiro: a previa da fila de revisao.
+    Vencimento,
+    /// Mais lapsos primeiro — as palavras que teimam em nao entrar.
+    MaisDificeis,
+}
+
+impl Ordem {
+    /// Trecho de `ORDER BY`. Sai de um enum, e nunca de texto da UI, porque
+    /// ordenacao e a unica parte da consulta que nao da para parametrizar.
+    fn sql(self) -> &'static str {
+        match self {
+            // Desempate por id em todas: sem ele, cards salvos no mesmo
+            // segundo trocam de lugar entre uma consulta e outra.
+            Ordem::Recentes => "c.created_at DESC, c.id DESC",
+            Ordem::Alfabetica => "c.lemma ASC, c.id ASC",
+            Ordem::Vencimento => "c.fsrs_due ASC, c.id ASC",
+            Ordem::MaisDificeis => "c.fsrs_lapses DESC, c.id DESC",
+        }
+    }
+}
+
+/// Filtros da tela Deck. Tudo opcional: o padrao e "o deck inteiro, sem os
+/// suspensos".
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardQuery {
+    /// Busca no lema e nas frases dos contextos.
+    #[serde(default)]
+    pub search: Option<String>,
+    #[serde(default)]
+    pub game: Option<String>,
+    /// Estado do FSRS (`new`, `learning`, `review`, `relearning`).
+    #[serde(default)]
+    pub state: Option<String>,
+    /// Suspensos entram na lista? Fora dela por padrao: "ja sei" e justamente
+    /// o que o usuario nao quer mais ver.
+    #[serde(default)]
+    pub include_suspended: bool,
+    #[serde(default)]
+    pub order: Ordem,
+    #[serde(default)]
+    pub limit: Option<u32>,
+    #[serde(default)]
+    pub offset: Option<u32>,
+}
+
+/// Quantos cards a lista traz quando a UI nao pede um limite.
+const LIMITE_PADRAO: u32 = 200;
+
+/// Transforma o texto digitado em padrao de `LIKE`.
+///
+/// `%` e `_` sao curingas do SQL: sem escapa-los, procurar por "100%" traria o
+/// deck inteiro. O `\` fica declarado como escape na propria consulta.
+fn padrao_de_busca(bruto: &str) -> String {
+    let escapado = bruto
+        .trim()
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    format!("%{escapado}%")
+}
+
+fn card_row(linha: &rusqlite::Row<'_>) -> rusqlite::Result<CardRow> {
+    Ok(CardRow {
+        id: linha.get("id")?,
+        lemma: linha.get("lemma")?,
+        created_at: linha.get("created_at")?,
+        suspended: linha.get::<_, i64>("suspended")? != 0,
+        fsrs_due: linha.get("fsrs_due")?,
+        fsrs_state: linha.get("fsrs_state")?,
+        fsrs_reps: linha.get("fsrs_reps")?,
+        fsrs_lapses: linha.get("fsrs_lapses")?,
+        contexts: linha.get("contexts")?,
+        last_sentence: linha.get("last_sentence")?,
+        last_game: linha.get("last_game")?,
+    })
+}
+
+/// A lista da tela Deck.
+pub fn list_cards(conexao: &Connection, consulta: &CardQuery) -> Result<Vec<CardRow>> {
+    let busca = consulta
+        .search
+        .as_deref()
+        .map(str::trim)
+        .filter(|texto| !texto.is_empty())
+        .map(padrao_de_busca);
+    let jogo = consulta.game.as_deref().filter(|texto| !texto.is_empty());
+    let estado = consulta.state.as_deref().filter(|texto| !texto.is_empty());
+
+    // O contexto mais recente entra por subconsulta em vez de `GROUP BY`:
+    // agrupar devolveria uma frase qualquer do card, e a que interessa e a
+    // ultima vez que a palavra apareceu.
+    let sql = format!(
+        "SELECT c.id, c.lemma, c.created_at, c.suspended, c.fsrs_due, c.fsrs_state,
+                c.fsrs_reps, c.fsrs_lapses,
+                (SELECT COUNT(*) FROM contexts n WHERE n.card_id = c.id) AS contexts,
+                ultimo.sentence_en AS last_sentence,
+                ultimo.game_name   AS last_game
+           FROM cards c
+           LEFT JOIN contexts ultimo ON ultimo.id = (
+                SELECT id FROM contexts u WHERE u.card_id = c.id
+                 ORDER BY u.captured_at DESC, u.id DESC LIMIT 1
+           )
+          WHERE (:incluir_suspensos = 1 OR c.suspended = 0)
+            AND (:estado IS NULL OR c.fsrs_state = :estado)
+            AND (:jogo IS NULL OR EXISTS (
+                    SELECT 1 FROM contexts g
+                     WHERE g.card_id = c.id AND g.game_name = :jogo))
+            AND (:busca IS NULL
+                 OR c.lemma LIKE :busca ESCAPE '\\'
+                 OR EXISTS (SELECT 1 FROM contexts s
+                             WHERE s.card_id = c.id
+                               AND (s.sentence_en LIKE :busca ESCAPE '\\'
+                                    OR s.form LIKE :busca ESCAPE '\\')))
+          ORDER BY {}
+          LIMIT :limite OFFSET :deslocamento",
+        consulta.order.sql()
+    );
+
+    let mut stmt = conexao.prepare(&sql)?;
+    let linhas = stmt.query_map(
+        rusqlite::named_params! {
+            ":incluir_suspensos": consulta.include_suspended as i64,
+            ":estado": estado,
+            ":jogo": jogo,
+            ":busca": busca,
+            ":limite": consulta.limit.unwrap_or(LIMITE_PADRAO),
+            ":deslocamento": consulta.offset.unwrap_or(0),
+        },
+        card_row,
+    )?;
+    Ok(linhas.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// Um card com todos os contextos, para a tela de detalhe.
+pub fn card_detail(conexao: &Connection, card_id: i64) -> Result<Option<CardDetail>> {
+    let card = conexao
+        .query_row(
+            "SELECT c.id, c.lemma, c.created_at, c.suspended, c.fsrs_due, c.fsrs_state,
+                    c.fsrs_reps, c.fsrs_lapses,
+                    (SELECT COUNT(*) FROM contexts n WHERE n.card_id = c.id) AS contexts,
+                    NULL AS last_sentence, NULL AS last_game
+               FROM cards c WHERE c.id = ?1",
+            [card_id],
+            card_row,
+        )
+        .optional()?;
+
+    let Some(card) = card else {
+        return Ok(None);
+    };
+
+    let mut stmt = conexao.prepare(
+        "SELECT id, card_id, form, sentence_en, sentence_pt, game_name,
+                screenshot_path, captured_at
+           FROM contexts WHERE card_id = ?1
+          ORDER BY captured_at DESC, id DESC",
+    )?;
+    let contexts = stmt
+        .query_map([card_id], |linha| {
+            Ok(CardContext {
+                id: linha.get(0)?,
+                card_id: linha.get(1)?,
+                form: linha.get(2)?,
+                sentence_en: linha.get(3)?,
+                sentence_pt: linha.get(4)?,
+                game_name: linha.get(5)?,
+                screenshot_path: linha.get(6)?,
+                captured_at: linha.get(7)?,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    Ok(Some(CardDetail { card, contexts }))
+}
+
+/// Jogos com pelo menos um contexto, para o filtro da tela.
+pub fn games(conexao: &Connection) -> Result<Vec<String>> {
+    let mut stmt = conexao.prepare(
+        "SELECT DISTINCT game_name FROM contexts
+          WHERE game_name IS NOT NULL AND game_name <> ''
+          ORDER BY game_name COLLATE NOCASE",
+    )?;
+    let jogos = stmt.query_map([], |linha| linha.get::<_, String>(0))?;
+    Ok(jogos.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// Marca (ou desmarca) "ja sei". Suspender tira o card da fila **sem** apagar
+/// o historico nem o agendamento: reativar devolve o card onde ele estava.
+pub fn set_suspended(conexao: &Connection, card_id: i64, suspenso: bool) -> Result<()> {
+    let linhas = conexao.execute(
+        "UPDATE cards SET suspended = ?2 WHERE id = ?1",
+        params![card_id, suspenso as i64],
+    )?;
+    if linhas == 0 {
+        return Err(Error::Deck(format!("card {card_id} nao existe")));
+    }
+    Ok(())
+}
+
+/// Corrige a traducao de um contexto — a maquina erra, e o card fica com o
+/// erro na frente se nao der para arrumar (F4).
+pub fn update_context(conexao: &Connection, context_id: i64, traducao: Option<&str>) -> Result<()> {
+    let traducao = traducao.map(str::trim).filter(|texto| !texto.is_empty());
+    let linhas = conexao.execute(
+        "UPDATE contexts SET sentence_pt = ?2 WHERE id = ?1",
+        params![context_id, traducao],
+    )?;
+    if linhas == 0 {
+        return Err(Error::Deck(format!("contexto {context_id} nao existe")));
+    }
+    Ok(())
+}
+
+/// Apaga o card e devolve os screenshots que ficaram orfaos.
+///
+/// Os arquivos sao apagados por quem chamou, ja fora da transacao: o `ON DELETE
+/// CASCADE` limpa o banco, mas ninguem avisa o disco.
+pub fn delete_card(conexao: &Connection, card_id: i64) -> Result<Vec<String>> {
+    let mut stmt = conexao.prepare(
+        "SELECT screenshot_path FROM contexts
+          WHERE card_id = ?1 AND screenshot_path IS NOT NULL",
+    )?;
+    let caminhos = stmt
+        .query_map([card_id], |linha| linha.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    let linhas = conexao.execute("DELETE FROM cards WHERE id = ?1", [card_id])?;
+    if linhas == 0 {
+        return Err(Error::Deck(format!("card {card_id} nao existe")));
+    }
+    Ok(caminhos)
+}
+
 fn contar_contextos(conexao: &Connection, card_id: i64) -> Result<u32> {
     Ok(conexao.query_row(
         "SELECT COUNT(*) FROM contexts WHERE card_id = ?1",
@@ -290,6 +576,69 @@ pub async fn deck_card_status(app: AppHandle, lemma: String) -> Result<Option<Ca
     })
     .await
     .map_err(|e| Error::Deck(format!("consulta ao deck abortada: {e}")))?
+}
+
+/// Roda `f` fora da main thread, com a conexao tomada. Todo comando da tela
+/// Deck passa por aqui — nenhum deles pode travar a janela enquanto le disco.
+async fn no_banco<T, F>(app: AppHandle, f: F) -> Result<T>
+where
+    T: Send + 'static,
+    F: FnOnce(&AppHandle, &Connection) -> Result<T> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(move || com_conexao(&app.clone(), |c| f(&app, c)))
+        .await
+        .map_err(|e| Error::Deck(format!("operacao no deck abortada: {e}")))?
+}
+
+#[tauri::command]
+pub async fn deck_list_cards(app: AppHandle, query: CardQuery) -> Result<Vec<CardRow>> {
+    no_banco(app, move |_, conexao| list_cards(conexao, &query)).await
+}
+
+#[tauri::command]
+pub async fn deck_card_detail(app: AppHandle, card_id: i64) -> Result<Option<CardDetail>> {
+    no_banco(app, move |_, conexao| card_detail(conexao, card_id)).await
+}
+
+#[tauri::command]
+pub async fn deck_games(app: AppHandle) -> Result<Vec<String>> {
+    no_banco(app, |_, conexao| games(conexao)).await
+}
+
+#[tauri::command]
+pub async fn deck_set_suspended(app: AppHandle, card_id: i64, suspended: bool) -> Result<()> {
+    no_banco(app, move |_, conexao| {
+        set_suspended(conexao, card_id, suspended)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn deck_update_context(
+    app: AppHandle,
+    context_id: i64,
+    sentence_pt: Option<String>,
+) -> Result<()> {
+    no_banco(app, move |_, conexao| {
+        update_context(conexao, context_id, sentence_pt.as_deref())
+    })
+    .await
+}
+
+/// Apaga o card, os contextos e os screenshots deles.
+#[tauri::command]
+pub async fn deck_delete_card(app: AppHandle, card_id: i64) -> Result<()> {
+    no_banco(app, move |app, conexao| {
+        for caminho in delete_card(conexao, card_id)? {
+            // O card ja saiu do banco: um arquivo que resiste vira lixo em
+            // media/, nao um erro na cara de quem so queria apagar o card.
+            if let Err(erro) = crate::media::remover(app, &caminho) {
+                eprintln!("[deck] screenshot {caminho} nao foi apagado: {erro}");
+            }
+        }
+        Ok(())
+    })
+    .await
 }
 
 #[cfg(test)]
@@ -457,6 +806,240 @@ mod tests {
         let conexao = banco();
         assert!(save_card(&conexao, &entrada("  ", "ran", "He ran away.")).is_err());
         assert!(save_card(&conexao, &entrada("run", "ran", "   ")).is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Gestao do deck
+    // -----------------------------------------------------------------------
+
+    /// Deck de tres cards em dois jogos, com um suspenso.
+    fn deck_de_exemplo() -> Connection {
+        let conexao = banco();
+        save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        save_card(&conexao, &entrada("dread", "dread", "I dread the night.")).expect("salvou");
+
+        let mut outro = entrada("blade", "blades", "The blades are sharp.");
+        outro.game_name = Some("Hollow Knight".into());
+        save_card(&conexao, &outro).expect("salvou");
+
+        set_suspended(&conexao, 2, true).expect("suspendeu dread");
+        conexao
+    }
+
+    fn lemas(cards: &[CardRow]) -> Vec<&str> {
+        cards.iter().map(|c| c.lemma.as_str()).collect()
+    }
+
+    #[test]
+    fn a_lista_esconde_os_suspensos_por_padrao() {
+        // "Ja sei" so vale a pena se a palavra realmente sumir da vista.
+        let conexao = deck_de_exemplo();
+        let cards = list_cards(&conexao, &CardQuery::default()).expect("listou");
+        assert_eq!(lemas(&cards), vec!["blade", "run"]);
+
+        let com_suspensos = list_cards(
+            &conexao,
+            &CardQuery {
+                include_suspended: true,
+                order: Ordem::Alfabetica,
+                ..CardQuery::default()
+            },
+        )
+        .expect("listou");
+        assert_eq!(lemas(&com_suspensos), vec!["blade", "dread", "run"]);
+    }
+
+    #[test]
+    fn a_lista_traz_o_contexto_mais_recente_do_card() {
+        let conexao = banco();
+        save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        save_card(&conexao, &entrada("run", "running", "She is running.")).expect("salvou");
+        conexao
+            .execute(
+                "UPDATE contexts SET captured_at = '2026-08-02T00:00:00Z'
+                  WHERE sentence_en = 'She is running.'",
+                [],
+            )
+            .expect("datou o segundo contexto");
+
+        let cards = list_cards(&conexao, &CardQuery::default()).expect("listou");
+        assert_eq!(cards.len(), 1, "um card por lema");
+        assert_eq!(cards[0].contexts, 2);
+        assert_eq!(cards[0].last_sentence.as_deref(), Some("She is running."));
+    }
+
+    #[test]
+    fn a_busca_alcanca_o_lema_e_as_frases() {
+        let conexao = deck_de_exemplo();
+        let buscar = |texto: &str| {
+            list_cards(
+                &conexao,
+                &CardQuery {
+                    search: Some(texto.into()),
+                    include_suspended: true,
+                    ..CardQuery::default()
+                },
+            )
+            .expect("buscou")
+        };
+
+        assert_eq!(lemas(&buscar("bla")), vec!["blade"], "pedaco do lema");
+        assert_eq!(lemas(&buscar("night")), vec!["dread"], "palavra da frase");
+        assert_eq!(lemas(&buscar("RAN")), vec!["run"], "busca sem caixa");
+        assert!(buscar("inexistente").is_empty());
+    }
+
+    #[test]
+    fn curinga_digitado_e_texto_e_nao_curinga() {
+        // Sem escapar, procurar por "%" traria o deck inteiro — e a busca
+        // pareceria ignorar o que foi digitado.
+        let conexao = deck_de_exemplo();
+        let cards = list_cards(
+            &conexao,
+            &CardQuery {
+                search: Some("%".into()),
+                include_suspended: true,
+                ..CardQuery::default()
+            },
+        )
+        .expect("buscou");
+        assert!(cards.is_empty(), "nenhum card tem '%' no texto: {cards:?}");
+    }
+
+    #[test]
+    fn o_filtro_de_jogo_usa_os_contextos_do_card() {
+        let conexao = deck_de_exemplo();
+        let cards = list_cards(
+            &conexao,
+            &CardQuery {
+                game: Some("Hollow Knight".into()),
+                include_suspended: true,
+                ..CardQuery::default()
+            },
+        )
+        .expect("filtrou");
+        assert_eq!(lemas(&cards), vec!["blade"]);
+        assert_eq!(games(&conexao).expect("jogos"), ["Hollow Knight", "Skyrim"]);
+    }
+
+    #[test]
+    fn a_ordem_alfabetica_e_a_de_vencimento_sao_diferentes() {
+        let conexao = deck_de_exemplo();
+        conexao
+            .execute(
+                "UPDATE cards SET fsrs_due = '2026-01-01T00:00:00Z' WHERE lemma = 'run'",
+                [],
+            )
+            .expect("venceu o run");
+
+        let ordenar = |ordem| {
+            list_cards(
+                &conexao,
+                &CardQuery {
+                    order: ordem,
+                    include_suspended: true,
+                    ..CardQuery::default()
+                },
+            )
+            .expect("ordenou")
+        };
+        assert_eq!(lemas(&ordenar(Ordem::Alfabetica)), ["blade", "dread", "run"]);
+        assert_eq!(
+            lemas(&ordenar(Ordem::Vencimento))[0],
+            "run",
+            "o vencido primeiro"
+        );
+    }
+
+    #[test]
+    fn o_detalhe_traz_os_contextos_do_mais_novo_para_o_mais_velho() {
+        let conexao = banco();
+        let salvo = save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        save_card(&conexao, &entrada("run", "running", "She is running.")).expect("salvou");
+        conexao
+            .execute(
+                "UPDATE contexts SET captured_at = '2026-08-02T00:00:00Z'
+                  WHERE sentence_en = 'She is running.'",
+                [],
+            )
+            .expect("datou");
+
+        let detalhe = card_detail(&conexao, salvo.resumo.id)
+            .expect("consultou")
+            .expect("existe");
+        assert_eq!(detalhe.card.lemma, "run");
+        assert_eq!(detalhe.contexts.len(), 2);
+        assert_eq!(detalhe.contexts[0].sentence_en, "She is running.");
+        assert_eq!(detalhe.contexts[1].form, "ran");
+    }
+
+    #[test]
+    fn detalhe_de_card_que_nao_existe_e_nada_em_vez_de_erro() {
+        let conexao = banco();
+        assert!(card_detail(&conexao, 404).expect("consultou").is_none());
+    }
+
+    #[test]
+    fn suspender_nao_mexe_no_agendamento() {
+        // O card volta para a fila onde parou quando o usuario perceber que,
+        // afinal, nao sabia a palavra.
+        let conexao = deck_de_exemplo();
+        let antes: String = conexao
+            .query_row("SELECT fsrs_due FROM cards WHERE id = 1", [], |l| l.get(0))
+            .expect("leu");
+
+        set_suspended(&conexao, 1, true).expect("suspendeu");
+        set_suspended(&conexao, 1, false).expect("reativou");
+
+        let depois: String = conexao
+            .query_row("SELECT fsrs_due FROM cards WHERE id = 1", [], |l| l.get(0))
+            .expect("leu");
+        assert_eq!(antes, depois);
+    }
+
+    #[test]
+    fn suspender_card_que_nao_existe_e_erro() {
+        let conexao = banco();
+        assert!(set_suspended(&conexao, 404, true).is_err());
+    }
+
+    #[test]
+    fn editar_a_traducao_do_contexto_grava_e_apaga() {
+        let conexao = banco();
+        let salvo = save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        let contexto = salvo.contexto_novo.expect("contexto novo");
+
+        update_context(&conexao, contexto, Some("  Ele fugiu.  ")).expect("editou");
+        assert_eq!(traducao(&conexao, contexto).as_deref(), Some("Ele fugiu."));
+
+        // Apagar a traducao ruim e uma edicao valida: melhor sem do que errada.
+        update_context(&conexao, contexto, Some("   ")).expect("limpou");
+        assert_eq!(traducao(&conexao, contexto), None);
+    }
+
+    fn traducao(conexao: &Connection, contexto: i64) -> Option<String> {
+        conexao
+            .query_row(
+                "SELECT sentence_pt FROM contexts WHERE id = ?1",
+                [contexto],
+                |l| l.get(0),
+            )
+            .expect("leu o contexto")
+    }
+
+    #[test]
+    fn apagar_o_card_devolve_os_screenshots_para_quem_apaga_os_arquivos() {
+        let conexao = banco();
+        let salvo = save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        let contexto = salvo.contexto_novo.expect("contexto novo");
+        set_screenshot(&conexao, contexto, "media/ctx-000001.webp").expect("anexou");
+
+        let orfaos = delete_card(&conexao, salvo.resumo.id).expect("apagou");
+        assert_eq!(orfaos, vec!["media/ctx-000001.webp".to_string()]);
+        assert!(
+            delete_card(&conexao, salvo.resumo.id).is_err(),
+            "apagar duas vezes tem que reclamar"
+        );
     }
 
     #[test]

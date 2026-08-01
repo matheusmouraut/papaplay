@@ -1,6 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import type {
+  CardDetail,
+  CardQuery,
+  CardRow,
   CardSummary,
   DictEntry,
   LookupResult,
@@ -82,6 +85,52 @@ export function deckSaveCard(input: SaveCardInput): Promise<CardSummary> {
 /** O card de um lema, ou `null` se a palavra ainda nao esta no deck. */
 export function deckCardStatus(lemma: string): Promise<CardSummary | null> {
   return invoke<CardSummary | null>("deck_card_status", { lemma });
+}
+
+/** A lista da tela Deck, ja filtrada e ordenada pelo core. */
+export function deckListCards(query: CardQuery): Promise<CardRow[]> {
+  return invoke<CardRow[]>("deck_list_cards", { query });
+}
+
+/** Um card com todos os contextos. `null` se ele acabou de ser excluido. */
+export function deckCardDetail(cardId: number): Promise<CardDetail | null> {
+  return invoke<CardDetail | null>("deck_card_detail", { cardId });
+}
+
+/** Jogos com pelo menos um contexto salvo — as opcoes do filtro. */
+export function deckGames(): Promise<string[]> {
+  return invoke<string[]>("deck_games");
+}
+
+/** Marca (ou desmarca) "ja sei". Nao mexe no agendamento do card. */
+export function deckSetSuspended(
+  cardId: number,
+  suspended: boolean,
+): Promise<void> {
+  return invoke<void>("deck_set_suspended", { cardId, suspended });
+}
+
+/** Corrige a traducao de um contexto. `null` apaga a traducao. */
+export function deckUpdateContext(
+  contextId: number,
+  sentencePt: string | null,
+): Promise<void> {
+  return invoke<void>("deck_update_context", { contextId, sentencePt });
+}
+
+/** Apaga o card, os contextos e os screenshots deles. */
+export function deckDeleteCard(cardId: number): Promise<void> {
+  return invoke<void>("deck_delete_card", { cardId });
+}
+
+/**
+ * Bytes do screenshot de um contexto.
+ *
+ * Vem pela IPC, e nao por `asset://`: o caminho do banco e configuravel, entao
+ * quem valida o caminho e o core (`media::resolver`).
+ */
+export function mediaScreenshot(path: string): Promise<ArrayBuffer> {
+  return invoke<ArrayBuffer>("media_screenshot", { path });
 }
 
 /** Executa N alternancias seguidas e devolve as estatisticas de latencia. */

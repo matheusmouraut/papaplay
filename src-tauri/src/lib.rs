@@ -59,6 +59,13 @@ pub fn run() {
             translate::translate_run,
             deck::deck_save_card,
             deck::deck_card_status,
+            deck::deck_list_cards,
+            deck::deck_card_detail,
+            deck::deck_games,
+            deck::deck_set_suspended,
+            deck::deck_update_context,
+            deck::deck_delete_card,
+            media::media_screenshot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

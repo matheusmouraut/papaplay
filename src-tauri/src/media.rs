@@ -121,6 +121,55 @@ pub fn salvar(app: &AppHandle, nome: &str, recorte: &Recorte) -> Result<String> 
     Ok(format!("{PASTA}/{nome}.webp"))
 }
 
+/// Resolve um caminho relativo do banco (`media/ctx-000012.webp`) em caminho
+/// absoluto, recusando qualquer coisa que aponte para fora da pasta.
+///
+/// O valor vem do banco, nao da rede — mas e o banco que sobrevive a
+/// importacoes e a edicoes manuais, e um `..` ali viraria leitura (ou remocao)
+/// de arquivo arbitrario a partir de um comando exposto a UI.
+pub fn resolver(app: &AppHandle, relativo: &str) -> Result<PathBuf> {
+    Ok(dir(app)?.join(nome_de_arquivo(relativo)?))
+}
+
+/// Extrai o nome do arquivo de um caminho relativo do banco.
+///
+/// Aceita so um componente simples depois do prefixo `media/`: nada de `..`,
+/// nada de subpasta, nada de caminho absoluto.
+fn nome_de_arquivo(relativo: &str) -> Result<&Path> {
+    let dentro_da_pasta = relativo
+        .strip_prefix(&format!("{PASTA}/"))
+        .or_else(|| relativo.strip_prefix(&format!("{PASTA}\\")))
+        .unwrap_or(relativo);
+    let nome = Path::new(dentro_da_pasta);
+
+    let mut componentes = nome.components();
+    match (componentes.next(), componentes.next()) {
+        (Some(std::path::Component::Normal(_)), None) => Ok(nome),
+        _ => Err(Error::Media(format!("caminho suspeito: {relativo}"))),
+    }
+}
+
+/// Bytes do screenshot, para a UI mostrar a imagem.
+pub fn ler(app: &AppHandle, relativo: &str) -> Result<Vec<u8>> {
+    let caminho = resolver(app, relativo)?;
+    std::fs::read(&caminho)
+        .map_err(|e| Error::Media(format!("nao leu {}: {e}", caminho.display())))
+}
+
+/// Apaga o arquivo de um contexto que deixou de existir. Arquivo ausente nao e
+/// erro: o resultado pedido — nao existir — ja e o que se tem.
+pub fn remover(app: &AppHandle, relativo: &str) -> Result<()> {
+    let caminho = resolver(app, relativo)?;
+    match std::fs::remove_file(&caminho) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(Error::Media(format!(
+            "nao apagou {}: {e}",
+            caminho.display()
+        ))),
+    }
+}
+
 /// Codifica e escreve o arquivo. Separado de [`salvar`] porque e a parte que os
 /// testes conseguem exercitar sem um `AppHandle`.
 pub fn gravar(caminho: &Path, recorte: &Recorte) -> Result<()> {
@@ -133,6 +182,22 @@ pub fn gravar(caminho: &Path, recorte: &Recorte) -> Result<()> {
             ExtendedColorType::Rgba8,
         )
         .map_err(|e| Error::Media(format!("nao gravou {}: {e}", caminho.display())))
+}
+
+// ---------------------------------------------------------------------------
+// Comandos
+// ---------------------------------------------------------------------------
+
+/// Bytes do screenshot de um contexto, para a `<img>` da tela Deck.
+///
+/// Vai pela IPC em vez do protocolo `asset://` de proposito: o caminho do banco
+/// e configuravel (`PAPAPLAY_DB`) e um escopo estatico no `tauri.conf.json` nao
+/// acompanharia isso — aqui quem valida o caminho e [`resolver`].
+#[tauri::command]
+pub async fn media_screenshot(app: AppHandle, path: String) -> Result<tauri::ipc::Response> {
+    tauri::async_runtime::spawn_blocking(move || ler(&app, &path).map(tauri::ipc::Response::new))
+        .await
+        .map_err(|e| Error::Media(format!("leitura do screenshot abortada: {e}")))?
 }
 
 #[cfg(test)]
@@ -207,6 +272,39 @@ mod tests {
     #[test]
     fn frame_vazio_nao_recorta() {
         assert!(recortar(&fonte(0, 0, &[]), bbox(0, 0, 5, 5), (0, 0)).is_none());
+    }
+
+    #[test]
+    fn o_caminho_do_banco_vira_o_nome_do_arquivo() {
+        assert_eq!(
+            nome_de_arquivo("media/ctx-000012.webp").expect("aceito"),
+            Path::new("ctx-000012.webp")
+        );
+        // Sem o prefixo tambem vale: e assim que um caminho ja resolvido volta
+        // para ca sem virar erro.
+        assert_eq!(
+            nome_de_arquivo("ctx-000012.webp").expect("aceito"),
+            Path::new("ctx-000012.webp")
+        );
+    }
+
+    #[test]
+    fn caminho_que_sai_da_pasta_e_recusado() {
+        // `ler` e `remover` sao comandos expostos a UI: um `..` vindo de um
+        // banco importado nao pode virar leitura (nem remocao) fora de media/.
+        for suspeito in [
+            "media/../../segredo.txt",
+            "../segredo.txt",
+            "sub/pasta.webp",
+            "C:\\Windows\\system.ini",
+            "/etc/passwd",
+            "",
+        ] {
+            assert!(
+                nome_de_arquivo(suspeito).is_err(),
+                "deveria recusar {suspeito:?}"
+            );
+        }
     }
 
     #[test]

@@ -201,6 +201,45 @@ export interface CardSummary {
   created: boolean;
 }
 
+/** Card como a lista da tela Deck o mostra. */
+export interface CardRow {
+  id: number;
+  lemma: string;
+  createdAt: string;
+  suspended: boolean;
+  fsrsDue: string;
+  fsrsState: FsrsState;
+  fsrsReps: number;
+  fsrsLapses: number;
+  /** Quantas vezes a palavra ja foi encontrada. */
+  contexts: number;
+  /** Frase do contexto mais recente — o que identifica o card na lista. */
+  lastSentence: string | null;
+  lastGame: string | null;
+}
+
+/** Um card com todos os contextos, para o painel de detalhe. */
+export interface CardDetail {
+  card: CardRow;
+  contexts: CardContext[];
+}
+
+/** Ordenacoes da lista do deck. */
+export type DeckOrder =
+  "recentes" | "alfabetica" | "vencimento" | "maisDificeis";
+
+/** Filtros da lista do deck. Tudo opcional. */
+export interface CardQuery {
+  search?: string | null;
+  game?: string | null;
+  state?: FsrsState | null;
+  /** Suspensos ("ja sei") ficam de fora por padrao. */
+  includeSuspended?: boolean;
+  order?: DeckOrder;
+  limit?: number;
+  offset?: number;
+}
+
 /** Ocorrencia da palavra num jogo, anexada a um card. */
 export interface CardContext {
   id: number;
