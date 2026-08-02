@@ -6,6 +6,13 @@ import { Estatisticas } from "./screens/Estatisticas";
 import { Revisar } from "./screens/Revisar";
 import { useMainStore, type Screen } from "./store";
 
+/**
+ * Janela principal.
+ *
+ * A navegação fica numa coluna estreita e silenciosa: o produto é o conteúdo
+ * (o deck, a revisão), não o próprio app. Referência de F7 — Notion/Linear.
+ */
+
 const NAV: { id: Screen; label: string }[] = [
   { id: "revisar", label: "Revisar" },
   { id: "deck", label: "Deck" },
@@ -27,8 +34,8 @@ export function App() {
 
   return (
     <div className="flex h-full bg-papa-bg text-papa-text">
-      <nav className="flex w-52 shrink-0 flex-col gap-1 border-r border-papa-border bg-papa-surface p-3">
-        <h1 className="mb-4 px-2 text-lg font-semibold tracking-tight">
+      <nav className="flex w-56 shrink-0 flex-col gap-0.5 border-r border-papa-border px-3 py-5">
+        <h1 className="mb-5 px-3 text-[13px] font-medium tracking-wide text-papa-faint uppercase">
           PapaPlay
         </h1>
         {NAV.map((item) => (
@@ -36,18 +43,23 @@ export function App() {
             key={item.id}
             type="button"
             onClick={() => setScreen(item.id)}
-            className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
+            className={`rounded-md px-3 py-1.5 text-left text-sm transition-colors duration-150 ${
               screen === item.id
-                ? "bg-papa-accent/15 text-papa-accent"
-                : "text-papa-muted hover:bg-white/5 hover:text-papa-text"
+                ? "bg-white/[0.07] text-papa-text"
+                : "text-papa-muted hover:bg-white/[0.04] hover:text-papa-text"
             }`}
           >
             {item.label}
           </button>
         ))}
+
+        <p className="mt-auto px-3 text-[11px] leading-relaxed text-papa-faint">
+          Segure <kbd className="font-mono">Alt+X</kbd> durante o jogo para
+          espiar uma palavra.
+        </p>
       </nav>
 
-      <main className="flex-1 overflow-auto p-8">
+      <main className="flex-1 overflow-hidden px-10 py-8">
         <Current />
       </main>
     </div>

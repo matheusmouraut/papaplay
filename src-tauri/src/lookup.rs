@@ -52,10 +52,9 @@ static PROXIMO_ID: AtomicU64 = AtomicU64::new(1);
 
 struct Captura {
     id: u64,
-    width: u32,
-    height: u32,
-    /// Pixels BGRA do recorte capturado.
-    pixels: Vec<u8>,
+    /// O frame como veio da tela. Guardado inteiro porque serve a dois donos:
+    /// o recorte do screenshot e a releitura ampliada do card.
+    frame: Frame,
     /// Caixa de cada linha reconhecida, em pixels **do frame** — nao as da
     /// overlay: recorte se faz na imagem, nao na tela.
     lines: Vec<BBox>,
@@ -166,18 +165,47 @@ fn models_dir(app: &AppHandle) -> Result<PathBuf> {
 
 /// Roda uma consulta em volta do cursor e devolve as palavras posicionadas.
 pub fn run(app: &AppHandle) -> Result<LookupResult> {
-    let comeco = Instant::now();
-
-    // Fora do modo lookup (probe, teste manual) nao ha alvo congelado, e ai a
+    // Fora de uma espiada (probe, teste manual) nao ha alvo congelado, e ai a
     // janela em foco e mesmo o alvo certo.
     let target = match overlay::lookup_target() {
         Some(alvo) => alvo,
         None => platform::foreground_target()?,
     };
+    read_around(app, &target, None, LOOKUP_REGION, ocr::Foco::CARD)
+}
+
+/// Le uma regiao de `size` em volta de `center` (ou do cursor, se `None`).
+///
+/// E o passo que a espiada repete enquanto o cursor anda: alvo e tamanho vem de
+/// fora justamente porque quem espia le varias vezes, em pontos diferentes, sem
+/// nunca reconsultar qual e a janela do jogo — ela ja foi congelada quando a
+/// tecla desceu.
+pub fn read_around(
+    app: &AppHandle,
+    target: &platform::ForegroundTarget,
+    center: Option<(i32, i32)>,
+    size: (u32, u32),
+    // `linhas`: quantas linhas em volta do cursor reconhecer (ver `ocr::Foco`).
+    linhas: usize,
+) -> Result<LookupResult> {
+    let comeco = Instant::now();
 
     let t_captura = Instant::now();
-    let frame = capture::capture_region_of(&target, LOOKUP_REGION, None)?;
+    let frame = capture::capture_region_of(target, size, center)?;
     let capture_ms = ms(t_captura);
+
+    // Onde o cursor caiu dentro do recorte. E o que diz ao OCR quais linhas
+    // valem o reconhecimento: ler a tela toda para responder sobre uma palavra
+    // custava mais de 1 s em telas densas (medido em 2026-08-01).
+    let foco = center.or_else(platform::cursor_pos).map(|(x, y)| {
+        (
+            (
+                (x - frame.x).clamp(0, frame.width.saturating_sub(1) as i32) as u32,
+                (y - frame.y).clamp(0, frame.height.saturating_sub(1) as i32) as u32,
+            ),
+            linhas,
+        )
+    });
 
     let t_ocr = Instant::now();
     let resultado = {
@@ -188,10 +216,28 @@ pub fn run(app: &AppHandle) -> Result<LookupResult> {
             *guarda = Some(Engine::load(&models_dir(app)?)?);
         }
         let engine = guarda.as_mut().expect("engine acabou de ser carregada");
-        ocr::recognize(engine, &frame)?
+        ocr::recognize(engine, &frame, foco)?
     };
     let ocr_ms = ms(t_ocr);
 
+    let mut saida = montar(resultado, frame, target);
+    saida.capture_ms = capture_ms;
+    saida.ocr_ms = ocr_ms;
+    saida.total_ms = ms(comeco);
+    Ok(saida)
+}
+
+/// Do resultado do OCR (pixels do recorte) para o que a overlay desenha
+/// (pixels logicos dela), guardando o frame no caminho.
+///
+/// As duas leituras da espiada terminam aqui — a que captura e a que reprocessa
+/// o frame guardado ([`expand_stored`]) —, e e o que garante que as duas
+/// devolvam coordenadas no mesmo sistema.
+fn montar(
+    resultado: ocr::OcrResult,
+    frame: Frame,
+    target: &platform::ForegroundTarget,
+) -> LookupResult {
     let origem = (frame.x, frame.y);
     let escala = target.scale_factor;
     let monitor = target.monitor;
@@ -236,17 +282,17 @@ pub fn run(app: &AppHandle) -> Result<LookupResult> {
         )
     });
 
-    Ok(LookupResult {
+    LookupResult {
         lookup_id,
         words,
         lines,
         cursor,
-        game_name: target.window_title,
+        game_name: target.window_title.clone(),
         region,
-        capture_ms,
-        ocr_ms,
-        total_ms: ms(comeco),
-    })
+        capture_ms: 0.0,
+        ocr_ms: 0.0,
+        total_ms: 0.0,
+    }
 }
 
 fn ms(desde: Instant) -> f64 {
@@ -260,13 +306,7 @@ fn ms(desde: Instant) -> f64 {
 fn guardar_captura(frame: Frame, lines: Vec<BBox>) -> u64 {
     let id = PROXIMO_ID.fetch_add(1, Ordering::Relaxed);
     if let Ok(mut guarda) = ULTIMA_CAPTURA.lock() {
-        *guarda = Some(Captura {
-            id,
-            width: frame.width,
-            height: frame.height,
-            pixels: frame.pixels,
-            lines,
-        });
+        *guarda = Some(Captura { id, frame, lines });
     }
     id
 }
@@ -286,13 +326,81 @@ pub fn recortar_linha(lookup_id: u64, line_index: usize) -> Option<media::Recort
     let area = *captura.lines.get(line_index)?;
     media::recortar(
         &media::Bgra {
-            width: captura.width,
-            height: captura.height,
-            pixels: &captura.pixels,
+            width: captura.frame.width,
+            height: captura.frame.height,
+            pixels: &captura.frame.pixels,
         },
         area,
         media::MARGEM,
     )
+}
+
+/// Le de novo o frame ja capturado, agora com a vizinhanca inteira da linha.
+///
+/// E o segundo tempo da espiada. O primeiro le uma linha so, porque o tooltip
+/// mostra uma traducao e precisa acompanhar o mouse; ao clicar, o card quer a
+/// **frase**, que costuma atravessar linhas — e ai vale pagar o reconhecimento
+/// das vizinhas.
+///
+/// Reaproveita o frame em memoria em vez de capturar de novo: entre o hover e
+/// o clique o jogo avancou, e uma captura nova traria outra tela. Isso tambem
+/// tira a captura (~20 ms) do caminho.
+pub fn expand_stored(
+    app: &AppHandle,
+    lookup_id: u64,
+    target: &platform::ForegroundTarget,
+) -> Result<Option<LookupResult>> {
+    let (frame, cursor) = {
+        let guarda = ULTIMA_CAPTURA
+            .lock()
+            .map_err(|_| Error::Ocr("captura envenenada".into()))?;
+        let Some(captura) = guarda.as_ref().filter(|c| c.id == lookup_id) else {
+            // Espiada encerrada ou leitura mais nova no lugar: quem chamou
+            // segue com o que ja tinha.
+            return Ok(None);
+        };
+        // Clonar os pixels (~2 MB) para soltar o cadeado antes do OCR: segurar
+        // durante a inferencia travaria a leitura seguinte.
+        (clonar(&captura.frame), platform::cursor_pos())
+    };
+
+    let foco = cursor.map(|(x, y)| {
+        (
+            (
+                (x - frame.x).clamp(0, frame.width.saturating_sub(1) as i32) as u32,
+                (y - frame.y).clamp(0, frame.height.saturating_sub(1) as i32) as u32,
+            ),
+            ocr::Foco::CARD,
+        )
+    });
+
+    let resultado = {
+        let mut guarda = ENGINE
+            .lock()
+            .map_err(|_| Error::Ocr("engine de OCR envenenada".into()))?;
+        if guarda.is_none() {
+            *guarda = Some(Engine::load(&models_dir(app)?)?);
+        }
+        ocr::recognize(
+            guarda.as_mut().expect("engine carregada"),
+            &frame,
+            foco,
+        )?
+    };
+
+    Ok(Some(montar(resultado, frame, target)))
+}
+
+fn clonar(frame: &Frame) -> Frame {
+    Frame {
+        width: frame.width,
+        height: frame.height,
+        x: frame.x,
+        y: frame.y,
+        scale_factor: frame.scale_factor,
+        window_title: frame.window_title.clone(),
+        pixels: frame.pixels.clone(),
+    }
 }
 
 /// Solta o frame da ultima consulta. Chamado ao sair do modo lookup.
@@ -300,6 +408,27 @@ pub fn forget_capture() {
     if let Ok(mut guarda) = ULTIMA_CAPTURA.lock() {
         *guarda = None;
     }
+}
+
+/// Carrega os modelos de OCR numa thread de fundo, para a primeira espiada
+/// nao pagar os ~170 ms de carga.
+///
+/// Silencioso de proposito: se os modelos nao estiverem no lugar, quem avisa e
+/// a primeira espiada, com a mensagem completa de [`models_dir`]. Reclamar no
+/// boot seria um erro sobre algo que o usuario ainda nem tentou usar.
+pub fn preload_engine(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let Ok(dir) = models_dir(&app) else { return };
+        let Ok(engine) = Engine::load(&dir) else { return };
+        if let Ok(mut guarda) = ENGINE.lock() {
+            // So preenche se ninguem chegou antes: uma espiada disparada
+            // durante o boot ja carregou o que precisava.
+            if guarda.is_none() {
+                *guarda = Some(engine);
+            }
+        }
+    });
 }
 
 /// Descarrega os modelos de OCR. Existe para a tela de configuracoes poder

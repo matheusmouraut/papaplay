@@ -107,6 +107,23 @@ pub fn region_around(monitor: MonitorRect, center: (i32, i32), size: (u32, u32))
     }
 }
 
+/// Prepara a captura do monitor em foco antes da primeira espiada.
+///
+/// O device D3D11 e o item de captura custam ~300 ms para nascer e depois ficam
+/// vivos na thread de captura. Pagar isso no boot, em segundo plano, e o que
+/// tira esse tempo do primeiro `Alt+X` do usuario.
+#[cfg(windows)]
+pub fn warm_up() {
+    std::thread::spawn(|| {
+        if let Ok(alvo) = platform::foreground_target() {
+            worker::warm_up(alvo.hmonitor, alvo.monitor);
+        }
+    });
+}
+
+#[cfg(not(windows))]
+pub fn warm_up() {}
+
 /// Captura o monitor inteiro onde esta a janela em foco.
 ///
 /// Custa caro no OCR — para o lookup use [`capture_focused_region`].

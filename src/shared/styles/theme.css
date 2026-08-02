@@ -7,10 +7,47 @@
  *
  * Qualquer cor nova do produto entra aqui, não nas folhas das janelas. */
 @theme {
-  --color-papa-bg: #0f1117;
-  --color-papa-surface: #171a23;
-  --color-papa-border: #262b38;
-  --color-papa-accent: #6ee7b7;
-  --color-papa-text: #e6e8ef;
-  --color-papa-muted: #8b93a7;
+  /* Superfícies: três degraus, não mais. Fundo, cartão, cartão elevado.
+     Mais tons do que isso vira ruído — a hierarquia é do texto (F7). */
+  --color-papa-bg: #0e0f13;
+  --color-papa-surface: #16181e;
+  --color-papa-raised: #1d2027;
+  --color-papa-border: #262932;
+  /* Borda de elemento em foco/hover, um degrau acima da normal. */
+  --color-papa-border-strong: #363a45;
+
+  /* Texto em três pesos de atenção: o que se lê, o que se consulta, o que
+     só se percebe. */
+  --color-papa-text: #edeef2;
+  --color-papa-muted: #9096a3;
+  --color-papa-faint: #626878;
+
+  /* Um acento só, e ele significa "salvo/ativo" — nunca decoração. */
+  --color-papa-accent: #7dd3a8;
+
+  /* Tipografia: uma família de interface neutra e uma monoespaçada para
+     fonética. Serifada no texto de leitura do card, que é onde o produto
+     quer parecer um editor, não um HUD. */
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, "Segoe UI Variable Text", "Segoe UI",
+    sans-serif;
+  --font-reading:
+    "Georgia", "Iowan Old Style", "Source Serif Pro", ui-serif, serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+
+  /* Movimento discreto: rápido o bastante para não ser notado durante o jogo
+     (F7), lento o bastante para não piscar. */
+  --ease-papa: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Um único ritmo de animação para tudo que aparece sobre o jogo. */
+@keyframes papa-surgir {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

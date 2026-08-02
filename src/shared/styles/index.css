@@ -6,3 +6,27 @@ body,
 #root {
   height: 100%;
 }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-papa-bg);
+  color: var(--color-papa-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Foco visível por teclado, invisível por mouse: acessibilidade sem o anel
+   azul aparecendo a cada clique. */
+:focus-visible {
+  outline: 2px solid
+    color-mix(in srgb, var(--color-papa-accent) 60%, transparent);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Barras de rolagem discretas — o conteúdo é que deve ser visto. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-papa-border-strong) transparent;
+}

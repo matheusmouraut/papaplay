@@ -101,6 +101,27 @@ export interface LookupResult {
   totalMs: number;
 }
 
+/**
+ * Estado da espiada (evento `peek://state`).
+ *
+ * `idle` = repouso; `peek` = tecla segurada, seguindo o cursor; `card` = o
+ * usuario clicou e o card esta aberto.
+ */
+export type PeekState = "idle" | "peek" | "card";
+
+/** A palavra sob o cursor (evento `peek://focus`). */
+export interface PeekFocus {
+  /** Leitura de onde a palavra saiu — vai junto ao salvar, para o screenshot. */
+  lookupId: number;
+  word: string;
+  /** Retangulo da palavra em pixels logicos da overlay. */
+  rect: OverlayRect;
+  lineIndex: number;
+  /** Frase onde a palavra esta — o contexto do card. */
+  sentence: string;
+  gameName: string | null;
+}
+
 /** Retangulo de um monitor em pixels fisicos da area de trabalho virtual. */
 export interface MonitorRect {
   x: number;

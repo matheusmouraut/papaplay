@@ -8,6 +8,7 @@ pub mod lookup;
 pub mod media;
 pub mod ocr;
 pub mod overlay;
+pub mod peek;
 pub mod platform;
 pub mod translate;
 
@@ -44,17 +45,23 @@ pub fn run() {
             // A overlay comeca visivel e passiva — esse e o estado de repouso.
             overlay::init(app.handle())?;
             hotkeys::register(app.handle())?;
+            // Em segundo plano, para a primeira espiada nao esperar por disco
+            // nem pela criacao do device de captura.
+            lookup::preload_engine(app.handle());
+            dict::preload(app.handle());
+            capture::warm_up();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             ping,
             overlay::overlay_set_mode,
-            overlay::overlay_toggle,
             overlay::overlay_status,
             overlay::overlay_check_geometry,
             overlay::overlay_bench,
             overlay::overlay_reset_size,
             lookup::lookup_run,
+            peek::peek_close,
+            peek::peek_state,
             dict::dict_lookup,
             translate::translate_run,
             deck::deck_save_card,

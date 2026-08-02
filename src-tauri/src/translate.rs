@@ -33,11 +33,14 @@
 //! # Politica de memoria
 //!
 //! Os dois grafos somam ~350 MB em disco e mais que isso vivos. Ao contrario
-//! do OCR, que fica carregado ([`crate::lookup`]), o tradutor e descarregado
-//! por [`unload_model`] quando a overlay volta ao estado passivo: o custo de
-//! recarregar (~1 s) so aparece na primeira frase de cada sessao de consulta,
-//! enquanto o custo de manter na RAM apareceria o tempo todo, por cima de um
-//! jogo.
+//! do OCR, que fica carregado ([`crate::lookup`]), o tradutor e descarregado —
+//! mas **por ociosidade** ([`unload_if_idle`]), nao a cada espiada.
+//!
+//! A primeira versao descarregava toda vez que a tecla era solta, e o efeito
+//! foi o oposto do pretendido: quem joga espia varias palavras seguidas, entao
+//! cada card pagava de novo o ~1 s de carga. Trocar por um prazo de ociosidade
+//! mantem a memoria devolvida quando o jogador parou de consultar, que era o
+//! objetivo, sem cobrar por isso no meio da cena.
 
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
@@ -385,6 +388,17 @@ fn models_dir(app: &AppHandle) -> Result<PathBuf> {
     )))
 }
 
+/// Quando o modelo carregado foi usado pela ultima vez.
+static ULTIMO_USO: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
+/// Ociosidade que autoriza devolver a RAM do tradutor.
+///
+/// Descarregar a cada espiada era pior do que o problema que resolvia: quem
+/// joga espia varias palavras seguidas, e cada uma pagava ~1 s de recarga.
+/// Tres minutos cobrem uma cena inteira de dialogo e ainda devolvem a memoria
+/// antes de o jogador sentir falta dela.
+const OCIOSIDADE_MAXIMA: std::time::Duration = std::time::Duration::from_secs(180);
+
 /// Traduz uma frase curta de ingles para portugues do Brasil.
 pub fn translate_sentence(app: &AppHandle, texto: &str) -> Result<String> {
     let mut guarda = ENGINE
@@ -393,16 +407,39 @@ pub fn translate_sentence(app: &AppHandle, texto: &str) -> Result<String> {
     if guarda.is_none() {
         *guarda = Some(Engine::load(&models_dir(app)?)?);
     }
+    if let Ok(mut ultimo) = ULTIMO_USO.lock() {
+        *ultimo = Some(std::time::Instant::now());
+    }
     guarda
         .as_mut()
         .expect("tradutor acabou de ser carregado")
         .translate(texto)
 }
 
-/// Libera o modelo NMT da memoria quando o overlay volta ao estado passivo.
+/// Libera a RAM do tradutor **se** ele estiver parado ha tempo suficiente.
+///
+/// Chamado ao fim de cada espiada. Devolve `true` quando descarregou de fato —
+/// o que quase nunca acontece durante uma sessao de jogo, que e o ponto.
+pub fn unload_if_idle() -> bool {
+    let ocioso = ULTIMO_USO
+        .lock()
+        .ok()
+        .and_then(|ultimo| *ultimo)
+        .is_none_or(|quando| quando.elapsed() >= OCIOSIDADE_MAXIMA);
+    if ocioso {
+        unload_model();
+    }
+    ocioso
+}
+
+/// Libera o modelo NMT da memoria, sem perguntar. E o caminho da tela de
+/// configuracoes ("devolver memoria agora") e do fechamento do app.
 pub fn unload_model() {
     if let Ok(mut guarda) = ENGINE.lock() {
         *guarda = None;
+    }
+    if let Ok(mut ultimo) = ULTIMO_USO.lock() {
+        *ultimo = None;
     }
 }
 

@@ -14,7 +14,7 @@ Toda a especificação está em `/docs`:
 
 - `docs/README.md` — índice e resumo
 - `docs/02-escopo-mvp.md` — o que entra/não entra no MVP (não adicionar escopo sem discutir)
-- `docs/03-funcionalidades.md` — spec detalhada de cada feature (F1–F7) com critérios de aceite
+- `docs/03-funcionalidades.md` — spec detalhada de cada feature (F1–F8) com critérios de aceite
 - `docs/04-arquitetura.md` — stack, componentes, modelo de dados SQLite, estrutura do repo
 - `docs/05-roadmap.md` — fases; `docs/07-diferenciais.md` — features de diferenciação priorizadas
 - `docs/spikes/` — roteiros das spikes da Fase 0
@@ -58,6 +58,8 @@ Toda a especificação está em `/docs`:
 | SRS                | FSRS via ts-fsrs                                            |
 | Banco              | SQLite único + pasta media/                                 |
 | Card               | Por lema; contextos múltiplos anexados ao mesmo card        |
+| Interação          | "Espiar": segurar `Alt+X` mostra, soltar esconde. Clique ou `Alt+C` abre o card. Sem modo persistente, sem roubo de foco do jogo, sem caixas em volta das palavras (F1) |
+| Visual             | Minimalista tipográfico, referência Notion/Linear (F7)     |
 
 ## Convenções
 

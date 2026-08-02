@@ -18,6 +18,7 @@
 mod detect;
 mod lines;
 mod recognize;
+pub mod sentences;
 
 use std::path::Path;
 
@@ -53,6 +54,12 @@ impl BBox {
     /// Centro vertical — base do agrupamento em linhas.
     pub fn center_y(&self) -> f32 {
         self.y as f32 + self.h as f32 / 2.0
+    }
+
+    /// Centro horizontal — usado para reconhecer texto centralizado, que e
+    /// como quase todo jogo desenha legenda e dialogo.
+    pub fn center_x(&self) -> f32 {
+        self.x as f32 + self.w as f32 / 2.0
     }
 
     /// Fracao da altura que as duas caixas compartilham (0.0 a 1.0).
@@ -137,10 +144,45 @@ impl Engine {
         detect::run(&mut self.det, image, &self.params)
     }
 
-    /// Pipeline completo sobre uma imagem RGB.
+    /// Pipeline completo sobre uma imagem RGB: le **tudo** que houver nela.
     pub fn recognize_image(&mut self, image: &RgbImage) -> Result<OcrResult> {
+        self.recognize_within(image, None)
+    }
+
+    /// Le so as linhas perto de `foco` (em pixels da imagem).
+    ///
+    /// # Por que existe
+    ///
+    /// A deteccao e barata e proporcional ao tamanho da imagem; o
+    /// reconhecimento e caro e proporcional ao **numero de linhas**. Medido no
+    /// uso real em 2026-08-01: uma tela cheia de texto dava ~250 palavras em
+    /// ~1,2 s de reconhecimento — para responder sobre **uma** palavra, a que
+    /// esta sob o cursor.
+    ///
+    /// Espiar nao precisa da tela: precisa da linha apontada e das vizinhas,
+    /// que sao o resto da frase (ver [`sentences`]). Ler so essa vizinhanca
+    /// tira o custo da densidade da tela e o prende ao que o usuario aponta.
+    /// `linhas` limita quantas linhas em volta do foco sao reconhecidas.
+    /// Ver [`Foco`] para as duas escolhas que o produto faz.
+    pub fn recognize_near(
+        &mut self,
+        image: &RgbImage,
+        foco: (u32, u32),
+        linhas: usize,
+    ) -> Result<OcrResult> {
+        self.recognize_within(image, Some((foco, linhas)))
+    }
+
+    fn recognize_within(
+        &mut self,
+        image: &RgbImage,
+        foco: Option<((u32, u32), usize)>,
+    ) -> Result<OcrResult> {
         let caixas = self.detect(image)?;
-        let agrupadas = lines::group(caixas, &self.params);
+        let mut agrupadas = lines::group(caixas, &self.params);
+        if let Some((ponto, linhas)) = foco {
+            agrupadas = perto_do_foco(agrupadas, ponto, linhas);
+        }
 
         let mut words = Vec::new();
         let mut out_lines = Vec::new();
@@ -182,6 +224,79 @@ impl Engine {
             lines: out_lines,
         })
     }
+}
+
+/// Quanto contexto o reconhecimento deve ler em volta do cursor.
+///
+/// Existem duas respostas porque existem dois momentos, e cobrar o preco do
+/// segundo no primeiro era o que deixava a espiada lenta (medido em
+/// 2026-08-01: 47 palavras, 421 ms, para mostrar **uma** traducao).
+pub struct Foco;
+
+impl Foco {
+    /// Espiando: so a linha sob o cursor. E tudo que o tooltip mostra, e o
+    /// gesto tem que parecer colado no mouse.
+    pub const TOOLTIP: usize = 1;
+
+    /// Card aberto: a linha e ate tres de cada lado, que e a fala inteira
+    /// (ver [`sentences`]). Custa mais, mas so depois de o usuario clicar —
+    /// e ai ele ja esta esperando o card, que tambem traduz.
+    pub const CARD: usize = 7;
+}
+
+/// Raio vertical do foco, em multiplos da altura da linha apontada.
+///
+/// Em alturas de linha, e nao em pixels, porque o que importa e "quantas
+/// linhas de distancia" — e isso vale igual num menu de fonte pequena e numa
+/// legenda grande.
+const RAIO_EM_LINHAS: f32 = 3.5;
+
+/// Fica com os grupos proximos do foco, em ordem de leitura.
+///
+/// Ordena por distancia para escolher, mas devolve na ordem original: o
+/// agrupamento em frases ([`sentences`]) le linhas vizinhas em sequencia, e
+/// baralhar aqui quebraria a frase.
+fn perto_do_foco(grupos: Vec<Vec<BBox>>, (fx, fy): (u32, u32), maximo: usize) -> Vec<Vec<BBox>> {
+    let envelopes: Vec<BBox> = grupos.iter().map(|g| lines::envelope(g)).collect();
+
+    // O raio sai da altura da linha apontada (ou da mediana, se o cursor nao
+    // estiver sobre nenhuma): usar a altura de uma linha qualquer daria raios
+    // absurdos numa tela que mistura titulo e corpo.
+    let altura = envelopes
+        .iter()
+        .find(|e| {
+            fy >= e.y && fy < e.bottom() && fx >= e.x.saturating_sub(e.h) && fx <= e.right() + e.h
+        })
+        .map(|e| e.h)
+        .or_else(|| {
+            let mut alturas: Vec<u32> = envelopes.iter().map(|e| e.h).collect();
+            alturas.sort_unstable();
+            alturas.get(alturas.len() / 2).copied()
+        })
+        .unwrap_or(0);
+    if altura == 0 {
+        return grupos;
+    }
+    let raio = altura as f32 * RAIO_EM_LINHAS;
+
+    let mut candidatos: Vec<(usize, f32)> = envelopes
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (i, (e.center_y() - fy as f32).abs()))
+        .filter(|(_, distancia)| *distancia <= raio)
+        .collect();
+    candidatos.sort_by(|a, b| a.1.total_cmp(&b.1));
+    candidatos.truncate(maximo.max(1));
+
+    let mut escolhidos: Vec<usize> = candidatos.into_iter().map(|(i, _)| i).collect();
+    escolhidos.sort_unstable();
+
+    grupos
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| escolhidos.binary_search(i).is_ok())
+        .map(|(_, grupo)| grupo)
+        .collect()
 }
 
 /// Corrige `line_index` depois que grupos sem texto foram descartados.
@@ -318,8 +433,20 @@ fn charset(caminho: &Path) -> Result<Vec<char>> {
 }
 
 /// Roda deteccao + reconhecimento sobre o frame, devolvendo bboxes por palavra.
-pub fn recognize(engine: &mut Engine, frame: &Frame) -> Result<OcrResult> {
-    engine.recognize_image(&frame_para_rgb(frame)?)
+///
+/// `foco` em pixels do frame limita o reconhecimento a vizinhanca daquele
+/// ponto — e o caminho da espiada. `None` le o frame inteiro, que e o que as
+/// ferramentas de medicao e as fixtures querem.
+pub fn recognize(
+    engine: &mut Engine,
+    frame: &Frame,
+    foco: Option<((u32, u32), usize)>,
+) -> Result<OcrResult> {
+    let imagem = frame_para_rgb(frame)?;
+    match foco {
+        Some((ponto, linhas)) => engine.recognize_near(&imagem, ponto, linhas),
+        None => engine.recognize_image(&imagem),
+    }
 }
 
 /// BGRA8 (formato da captura do Windows) para RGB8 (formato dos modelos).
@@ -349,6 +476,107 @@ mod tests {
 
     fn bbox(x: u32, y: u32, w: u32, h: u32) -> BBox {
         BBox { x, y, w, h }
+    }
+
+    /// Vinte linhas empilhadas de 20px, como uma tela cheia de texto.
+    fn tela_densa() -> Vec<Vec<BBox>> {
+        (0..20)
+            .map(|i| vec![bbox(100, 100 + i * 26, 400, 20)])
+            .collect()
+    }
+
+    fn topos(grupos: &[Vec<BBox>]) -> Vec<u32> {
+        grupos.iter().map(|g| lines::envelope(g).y).collect()
+    }
+
+    #[test]
+    fn so_a_vizinhanca_do_cursor_vai_para_o_reconhecimento() {
+        // O custo do reconhecimento e por linha: numa tela densa, ler tudo
+        // custava >1 s para responder sobre uma palavra (medido em 2026-08-01).
+        let escolhidos = perto_do_foco(tela_densa(), (300, 360), Foco::CARD);
+        assert!(
+            escolhidos.len() <= Foco::CARD,
+            "{} linhas passaram",
+            escolhidos.len()
+        );
+        assert!(!escolhidos.is_empty(), "a linha apontada tem que passar");
+    }
+
+    #[test]
+    fn o_tooltip_le_uma_linha_so() {
+        // A diferenca entre os dois momentos: espiando, uma traducao basta, e
+        // o gesto tem que acompanhar o mouse. Sete linhas custavam 421 ms.
+        let escolhidos = perto_do_foco(tela_densa(), (300, 370), Foco::TOOLTIP);
+        assert_eq!(escolhidos.len(), 1);
+        assert_eq!(topos(&escolhidos), vec![360], "e a linha apontada");
+    }
+
+    #[test]
+    fn a_linha_apontada_esta_entre_as_escolhidas() {
+        // Cursor no meio da linha que comeca em y=360.
+        let escolhidos = perto_do_foco(tela_densa(), (300, 370), Foco::CARD);
+        assert!(
+            topos(&escolhidos).contains(&360),
+            "{:?}",
+            topos(&escolhidos)
+        );
+    }
+
+    #[test]
+    fn as_vizinhas_passam_junto_para_a_frase_nao_truncar() {
+        // A fala de jogo atravessa linhas: sem as vizinhas, o card e a traducao
+        // sairiam pela metade (ver `ocr::sentences`).
+        let escolhidos = topos(&perto_do_foco(tela_densa(), (300, 370), Foco::CARD));
+        assert!(escolhidos.contains(&334), "a de cima: {escolhidos:?}");
+        assert!(escolhidos.contains(&386), "a de baixo: {escolhidos:?}");
+    }
+
+    #[test]
+    fn as_escolhidas_saem_em_ordem_de_leitura() {
+        // A busca da frase le linhas em sequencia; fora de ordem, ela quebra.
+        let topos = topos(&perto_do_foco(tela_densa(), (300, 370), Foco::CARD));
+        let mut ordenados = topos.clone();
+        ordenados.sort_unstable();
+        assert_eq!(topos, ordenados);
+    }
+
+    #[test]
+    fn texto_longe_do_cursor_fica_de_fora() {
+        let escolhidos = topos(&perto_do_foco(tela_densa(), (300, 110), Foco::CARD));
+        assert!(
+            !escolhidos.iter().any(|&y| y > 300),
+            "linha distante entrou: {escolhidos:?}"
+        );
+    }
+
+    #[test]
+    fn tela_sem_texto_nao_entra_em_panico() {
+        assert!(perto_do_foco(Vec::new(), (300, 300), Foco::CARD).is_empty());
+    }
+
+    #[test]
+    fn limite_zero_ainda_devolve_a_linha_apontada() {
+        // Defesa contra um `Foco` mal configurado: zero linha seria um tooltip
+        // que nunca acha palavra nenhuma.
+        assert_eq!(perto_do_foco(tela_densa(), (300, 370), 0).len(), 1);
+    }
+
+    #[test]
+    fn o_raio_acompanha_o_tamanho_da_fonte() {
+        // Mesma distancia em pixels, alturas diferentes: numa fonte grande as
+        // linhas vizinhas ainda sao vizinhas; numa pequena, ja sao outro bloco.
+        let grande: Vec<Vec<BBox>> = (0..6)
+            .map(|i| vec![bbox(100, 100 + i * 60, 400, 48)])
+            .collect();
+        let pequena: Vec<Vec<BBox>> = (0..6)
+            .map(|i| vec![bbox(100, 100 + i * 60, 400, 10)])
+            .collect();
+        let com_fonte_grande = perto_do_foco(grande, (300, 130), Foco::CARD).len();
+        let com_fonte_pequena = perto_do_foco(pequena, (300, 105), Foco::CARD).len();
+        assert!(
+            com_fonte_grande > com_fonte_pequena,
+            "grande {com_fonte_grande}, pequena {com_fonte_pequena}"
+        );
     }
 
     #[test]

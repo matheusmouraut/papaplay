@@ -17,6 +17,35 @@ default-run = "papaplay"
 name = "papaplay_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# Sem isto, `tauri dev` roda o OCR a opt-level 0 e o app parece lento por um
+# motivo que nao existe em producao. Medido em 2026-08-01 com o `ocr-spike`
+# numa regiao de 1200x420 (a mesma da espiada):
+#
+#   debug puro   media 354 ms, pior 580 ms, deteccao 255 ms
+#   release      media 104 ms, pior 278 ms, deteccao  38 ms
+#
+# A inferencia ONNX e nativa e nao muda; o que custa e o nosso pre/pos
+# processamento (conversao de cor, resize, binarizacao, CTC) e o crate `image`.
+[profile.dev]
+# 1 e o joelho da curva: pega a maior parte do ganho sem transformar cada
+# recompilacao do nosso codigo numa espera.
+opt-level = 1
+
+# Desligado porque `opt-level = 1` + compilacao incremental quebra o link neste
+# alvo (x86_64-pc-windows-msvc): o build falha com dezenas de
+# `LNK2019: simbolo externo nao resolvido, anon.<hash>.llvm.<hash>`, referentes
+# a codigo do serde_json que nao mudou. Aconteceu duas vezes em 2026-08-01, e
+# das duas so `cargo clean -p papaplay` resolveu.
+#
+# O custo e recompilar a crate inteira a cada mudanca (~25 s). E menos do que
+# perder tempo diagnosticando um erro de linker que parece corrupcao de codigo
+# e nao e.
+incremental = false
+
+[profile.dev.package."*"]
+# Dependencias sao compiladas uma vez e reusadas — aqui otimizar e de graca.
+opt-level = 3
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -79,5 +108,8 @@ windows = { version = "0.61", features = [
   "Win32_System_WinRT_Direct3D11",
   "Win32_System_WinRT_Graphics_Capture",
   "Win32_UI_HiDpi",
+  # Leitura do estado do botao do mouse enquanto a espiada esta ativa
+  # (GetAsyncKeyState). Leitura de estado global, nunca hook.
+  "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
 ] }

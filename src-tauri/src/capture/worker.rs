@@ -36,6 +36,26 @@ struct Pedido {
 
 static FILA: OnceLock<Mutex<Sender<Pedido>>> = OnceLock::new();
 
+/// Cria o device e o item de captura antes de precisar deles.
+///
+/// A criacao custa ~300 ms (medido em 2026-08-01: uma leitura de 410 ms era
+/// 325 de captura para 85 de OCR). Sem isto, a primeira espiada da sessao paga
+/// essa conta inteira — justo a que forma a primeira impressao do produto.
+///
+/// Silencioso e best-effort: se falhar, a primeira captura de verdade tenta de
+/// novo e reporta o erro com contexto.
+pub fn warm_up(hmonitor: isize, monitor: MonitorRect) {
+    // Um recorte minusculo no canto: o custo esta em criar o device, nao em
+    // copiar pixels, e assim o aquecimento nao rouba banda da GPU do jogo.
+    let regiao = Region {
+        x: monitor.x,
+        y: monitor.y,
+        width: 16,
+        height: 16,
+    };
+    let _ = capture(hmonitor, monitor, regiao);
+}
+
 /// Captura um recorte do monitor `hmonitor`, ligando a thread na primeira vez.
 pub fn capture(hmonitor: isize, monitor: MonitorRect, regiao: Region) -> Result<Shot> {
     let (tx, rx) = sync_channel::<Result<Shot>>(1);

@@ -216,6 +216,22 @@ pub fn lookup(app: &AppHandle, word: &str) -> Result<Option<DictEntry>> {
     com_conexao(app, |conn| buscar(conn, word))
 }
 
+/// Abre o dicionario numa thread de fundo, no boot.
+///
+/// Uma busca de verdade junto: abrir o arquivo e barato, mas a primeira
+/// consulta ainda paga o `prepare` das duas consultas e a leitura das paginas
+/// de indice do disco. Fazer isso antes tira esse custo do primeiro tooltip,
+/// que e o momento em que o produto tem 300 ms para responder (doc 03).
+///
+/// Silencioso: se o dicionario faltar, quem avisa e a primeira consulta de
+/// verdade, com a mensagem completa.
+pub fn preload(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let _ = lookup(&app, "the");
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Conexao
 // ---------------------------------------------------------------------------

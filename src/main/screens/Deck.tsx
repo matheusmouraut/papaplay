@@ -94,13 +94,13 @@ export function Deck() {
       : null;
 
   return (
-    <section className="flex h-full flex-col gap-4">
-      <header>
-        <h2 className="text-2xl font-semibold tracking-tight">Deck</h2>
-        <p className="mt-1 text-sm text-papa-muted">
+    <section className="flex h-full flex-col gap-5">
+      <header className="flex items-baseline gap-3">
+        <h2 className="font-reading text-3xl tracking-tight">Deck</h2>
+        <p className="text-sm text-papa-faint">
           {cards.data
-            ? `${cards.data.length} ${cards.data.length === 1 ? "card" : "cards"}`
-            : "Carregando…"}
+            ? `${cards.data.length} ${cards.data.length === 1 ? "palavra" : "palavras"}`
+            : "carregando…"}
         </p>
       </header>
 
@@ -109,7 +109,7 @@ export function Deck() {
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar palavra ou frase…"
-          className="min-w-56 flex-1 rounded-md border border-papa-border bg-papa-surface px-3 py-2 text-sm outline-none placeholder:text-papa-muted/70 focus:border-papa-accent/60"
+          className="min-w-56 flex-1 rounded-lg border border-papa-border bg-papa-surface px-3 py-2 text-sm outline-none transition-colors duration-150 placeholder:text-papa-faint hover:border-papa-border-strong focus:border-papa-accent/50"
         />
 
         <Select value={jogo} onChange={setJogo} label="Todos os jogos">
@@ -140,7 +140,7 @@ export function Deck() {
           ))}
         </Select>
 
-        <label className="flex items-center gap-2 text-sm text-papa-muted">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-papa-muted">
           <input
             type="checkbox"
             checked={incluirSuspensos}
@@ -151,21 +151,23 @@ export function Deck() {
         </label>
       </div>
 
-      <div className="flex min-h-0 flex-1 gap-4">
-        <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-papa-border">
+      <div className="flex min-h-0 flex-1 gap-5">
+        <div className="min-h-0 flex-1 overflow-auto">
           {cards.isError && (
-            <p className="p-4 text-sm text-red-400">{String(cards.error)}</p>
-          )}
-
-          {cards.data?.length === 0 && (
-            <p className="p-6 text-sm text-papa-muted">
-              {busca || jogo || estado
-                ? "Nenhum card com esses filtros."
-                : "Nenhum card ainda. Salve uma palavra pelo overlay (Alt+X) durante o jogo."}
+            <p className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+              {String(cards.error)}
             </p>
           )}
 
-          <ul className="divide-y divide-papa-border">
+          {cards.data?.length === 0 && (
+            <p className="max-w-md py-10 text-sm leading-relaxed text-papa-muted">
+              {busca || jogo || estado
+                ? "Nenhuma palavra com esses filtros."
+                : "Nenhuma palavra ainda. Durante o jogo, segure Alt+X, aponte para uma palavra e clique nela para salvar."}
+            </p>
+          )}
+
+          <ul className="divide-y divide-papa-border/60">
             {(cards.data ?? []).map((card) => (
               <LinhaDoCard
                 key={card.id}
@@ -207,7 +209,7 @@ function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-md border border-papa-border bg-papa-surface px-3 py-2 text-sm outline-none focus:border-papa-accent/60"
+      className="cursor-pointer rounded-lg border border-papa-border bg-papa-surface px-3 py-2 text-sm text-papa-muted outline-none transition-colors duration-150 hover:border-papa-border-strong hover:text-papa-text focus:border-papa-accent/50"
     >
       {label !== null && <option value="">{label}</option>}
       {children}
@@ -229,31 +231,27 @@ function LinhaDoCard({
       <button
         type="button"
         onClick={onSelect}
-        className={`flex w-full flex-col items-start gap-1 px-4 py-3 text-left transition-colors ${
-          selecionado ? "bg-papa-accent/10" : "hover:bg-white/5"
+        className={`group flex w-full flex-col items-start gap-1 rounded-lg px-3 py-3 text-left transition-colors duration-150 ${
+          selecionado ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
         }`}
       >
-        <div className="flex w-full items-center gap-2">
-          <span className="font-medium">{card.lemma}</span>
-          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-papa-muted">
-            {ESTADO_LABEL[card.fsrsState]}
+        <div className="flex w-full items-baseline gap-2">
+          <span className="font-reading text-base text-papa-text">
+            {card.lemma}
           </span>
-          {card.suspended && (
-            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-papa-muted">
-              já sei
-            </span>
-          )}
-          {card.contexts > 1 && (
-            <span className="text-xs text-papa-muted">
-              {card.contexts} contextos
-            </span>
-          )}
-          <span className="ml-auto shrink-0 text-xs text-papa-muted">
+          {/* Estado e contagem em texto simples, sem pílula: o que se procura
+              aqui é a palavra, e cada caixinha rouba um pouco dela. */}
+          <span className="text-xs text-papa-faint">
+            {ESTADO_LABEL[card.fsrsState]}
+            {card.contexts > 1 && ` · ${card.contexts} contextos`}
+            {card.suspended && " · já sei"}
+          </span>
+          <span className="ml-auto shrink-0 text-xs text-papa-faint">
             {card.lastGame ?? data(card.createdAt)}
           </span>
         </div>
         {card.lastSentence && (
-          <p className="line-clamp-1 text-xs text-papa-muted">
+          <p className="line-clamp-1 font-reading text-[13px] text-papa-muted">
             {card.lastSentence}
           </p>
         )}
@@ -277,33 +275,34 @@ function Detalhe({
   const card = detalhe.data?.card;
 
   return (
-    <aside className="flex min-h-0 w-96 shrink-0 flex-col overflow-auto rounded-lg border border-papa-border bg-papa-surface p-4">
+    <aside className="flex min-h-0 w-[26rem] shrink-0 flex-col overflow-auto rounded-xl border border-papa-border bg-papa-surface px-5 py-4">
       {!card ? (
         <p className="text-sm text-papa-muted">
-          {detalhe.isPending ? "Carregando…" : "Card não encontrado."}
+          {detalhe.isPending ? "carregando…" : "Card não encontrado."}
         </p>
       ) : (
         <>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-xl font-semibold">{card.lemma}</h3>
+          <header className="flex items-baseline gap-2">
+            <h3 className="font-reading text-2xl">{card.lemma}</h3>
             <button
               type="button"
               onClick={onFechar}
-              className="ml-auto text-sm text-papa-muted hover:text-papa-text"
+              className="ml-auto rounded px-1 text-sm text-papa-faint transition-colors duration-150 hover:text-papa-text"
               aria-label="Fechar detalhe"
             >
               ✕
             </button>
-          </div>
+          </header>
 
-          <dl className="mt-3 space-y-1 text-xs text-papa-muted">
-            <Info rotulo="Salvo em" valor={data(card.createdAt)} />
-            <Info
-              rotulo="Estado"
-              valor={`${ESTADO_LABEL[card.fsrsState]} · ${card.fsrsReps} revisões · ${card.fsrsLapses} lapsos`}
-            />
-            <Info rotulo="Próxima revisão" valor={data(card.fsrsDue)} />
-          </dl>
+          {/* Uma linha só: são três fatos pequenos, e uma tabela de rótulos
+              para eles pesaria mais do que a informação. */}
+          <p className="mt-1 text-xs leading-relaxed text-papa-faint">
+            salvo em {data(card.createdAt)} · {ESTADO_LABEL[card.fsrsState]} ·{" "}
+            {card.fsrsReps} {card.fsrsReps === 1 ? "revisão" : "revisões"}
+            {card.fsrsLapses > 0 && ` · ${card.fsrsLapses} lapsos`}
+            <br />
+            próxima revisão em {data(card.fsrsDue)}
+          </p>
 
           <div className="mt-4 flex gap-2">
             <button
@@ -312,7 +311,7 @@ function Detalhe({
               onClick={() =>
                 suspender.mutate({ id: card.id, suspended: !card.suspended })
               }
-              className="flex-1 rounded-md border border-papa-border px-3 py-1.5 text-sm hover:bg-white/5 disabled:opacity-50"
+              className="flex-1 rounded-lg border border-papa-border px-3 py-1.5 text-sm text-papa-muted transition-colors duration-150 hover:border-papa-border-strong hover:text-papa-text disabled:opacity-50"
             >
               {card.suspended ? "Voltar para a fila" : "Já sei esta"}
             </button>
@@ -323,10 +322,10 @@ function Detalhe({
                 if (confirmando) excluir.mutate(card.id);
                 else setConfirmando(true);
               }}
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm disabled:opacity-50 ${
+              className={`flex-1 rounded-lg border px-3 py-1.5 text-sm transition-colors duration-150 disabled:opacity-50 ${
                 confirmando
-                  ? "border border-red-500/60 bg-red-500/10 text-red-300"
-                  : "border border-papa-border hover:bg-white/5"
+                  ? "border-red-500/50 bg-red-500/10 text-red-300"
+                  : "border-papa-border text-papa-muted hover:border-papa-border-strong hover:text-papa-text"
               }`}
             >
               {confirmando ? "Confirmar exclusão" : "Excluir"}
@@ -334,15 +333,16 @@ function Detalhe({
           </div>
 
           {confirmando && (
-            <p className="mt-1 text-[11px] text-papa-muted">
-              Apaga o card, os contextos e os screenshots. Não dá para desfazer.
+            <p className="mt-1.5 text-[11px] leading-relaxed text-papa-faint">
+              Apaga a palavra, os contextos e os screenshots. Não dá para
+              desfazer.
             </p>
           )}
 
-          <h4 className="mt-6 text-xs font-medium uppercase tracking-wide text-papa-muted">
-            Contextos
+          <h4 className="mt-7 text-[11px] font-medium tracking-wide text-papa-faint uppercase">
+            Onde apareceu
           </h4>
-          <ul className="mt-2 space-y-4">
+          <ul className="mt-3 space-y-3">
             {detalhe.data?.contexts.map((contexto) => (
               <Contexto key={contexto.id} contexto={contexto} />
             ))}
@@ -350,15 +350,6 @@ function Detalhe({
         </>
       )}
     </aside>
-  );
-}
-
-function Info({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <dt>{rotulo}</dt>
-      <dd className="text-right text-papa-text">{valor}</dd>
-    </div>
   );
 }
 
@@ -372,8 +363,10 @@ function Contexto({ contexto }: { contexto: CardContext }) {
   const [texto, setTexto] = useState(contexto.sentencePt ?? "");
 
   return (
-    <li className="rounded-md border border-papa-border p-3">
-      <p className="text-sm text-papa-text">{contexto.sentenceEn}</p>
+    <li className="rounded-lg border border-papa-border px-3.5 py-3">
+      <p className="font-reading text-[15px] leading-relaxed text-papa-text">
+        {contexto.sentenceEn}
+      </p>
 
       {editando ? (
         <div className="mt-2">
@@ -381,9 +374,10 @@ function Contexto({ contexto }: { contexto: CardContext }) {
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             rows={2}
-            className="w-full rounded-md border border-papa-border bg-papa-bg px-2 py-1 text-sm outline-none focus:border-papa-accent/60"
+            autoFocus
+            className="w-full rounded-lg border border-papa-border bg-papa-bg px-2.5 py-1.5 font-reading text-sm outline-none focus:border-papa-accent/50"
           />
-          <div className="mt-1 flex gap-2">
+          <div className="mt-1.5 flex gap-2">
             <button
               type="button"
               disabled={atualizar.isPending}
@@ -393,7 +387,7 @@ function Contexto({ contexto }: { contexto: CardContext }) {
                   { onSuccess: () => setEditando(false) },
                 )
               }
-              className="rounded border border-papa-accent/50 px-2 py-0.5 text-xs text-papa-accent hover:bg-papa-accent/10 disabled:opacity-50"
+              className="rounded-md border border-papa-accent/40 px-2.5 py-0.5 text-xs text-papa-accent transition-colors duration-150 hover:bg-papa-accent/10 disabled:opacity-50"
             >
               Salvar
             </button>
@@ -403,7 +397,7 @@ function Contexto({ contexto }: { contexto: CardContext }) {
                 setTexto(contexto.sentencePt ?? "");
                 setEditando(false);
               }}
-              className="rounded border border-papa-border px-2 py-0.5 text-xs text-papa-muted hover:bg-white/5"
+              className="rounded-md px-2.5 py-0.5 text-xs text-papa-faint transition-colors duration-150 hover:text-papa-text"
             >
               Cancelar
             </button>
@@ -414,14 +408,18 @@ function Contexto({ contexto }: { contexto: CardContext }) {
           type="button"
           onClick={() => setEditando(true)}
           title="Clique para corrigir a tradução"
-          className="mt-1 w-full text-left text-sm text-papa-muted hover:text-papa-text"
+          className="mt-1 w-full text-left font-reading text-sm leading-relaxed text-papa-muted transition-colors duration-150 hover:text-papa-text"
         >
-          {contexto.sentencePt ?? "Sem tradução — clique para escrever uma."}
+          {contexto.sentencePt ?? (
+            <span className="text-papa-faint">
+              sem tradução — clique para escrever
+            </span>
+          )}
         </button>
       )}
 
       {contexto.screenshotPath && (
-        <div className="mt-2">
+        <div className="mt-2.5">
           <Screenshot
             path={contexto.screenshotPath}
             alt={`Trecho da tela com “${contexto.form}”`}
@@ -429,7 +427,7 @@ function Contexto({ contexto }: { contexto: CardContext }) {
         </div>
       )}
 
-      <p className="mt-2 text-[11px] text-papa-muted/80">
+      <p className="mt-2.5 text-[11px] text-papa-faint">
         {contexto.form} · {contexto.gameName ?? "jogo desconhecido"} ·{" "}
         {data(contexto.capturedAt)}
       </p>

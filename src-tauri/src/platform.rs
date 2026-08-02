@@ -48,9 +48,11 @@ mod imp {
         MONITOR_DEFAULTTOPRIMARY,
     };
     use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
     use windows::Win32::UI::WindowsAndMessaging::{
-        GetCursorPos, GetForegroundWindow, GetWindowTextLengthW, GetWindowTextW,
-        SetForegroundWindow, SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
+        GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowLongPtrW,
+        GetWindowTextLengthW, GetWindowTextW, SetForegroundWindow, SetWindowDisplayAffinity,
+        SetWindowLongPtrW, GWL_EXSTYLE, SM_SWAPBUTTON, WDA_EXCLUDEFROMCAPTURE, WS_EX_NOACTIVATE,
     };
 
     use super::{ForegroundTarget, MonitorRect};
@@ -163,6 +165,45 @@ mod imp {
         }
     }
 
+    /// Botao **principal** do mouse pressionado neste instante.
+    ///
+    /// Leitura de estado global, do mesmo tipo que `GetCursorPos`: nao instala
+    /// hook, nao intercepta nada e nao impede o clique de chegar ao jogo (ver
+    /// CLAUDE.md, regra 1). E o unico jeito de saber do clique enquanto a
+    /// overlay esta click-through — nesse estado o webview nao recebe mouse.
+    ///
+    /// Respeita a troca de botoes do Windows (canhotos): quem inverteu os
+    /// botoes clica com o direito, e e esse clique que conta.
+    pub fn primary_button_down() -> bool {
+        // SAFETY: leitura de estado global; `GetSystemMetrics` e infalivel.
+        let trocado = unsafe { GetSystemMetrics(SM_SWAPBUTTON) } != 0;
+        let virtual_key = if trocado { 0x02 } else { VK_LBUTTON.0 as i32 };
+        // O bit alto diz "pressionado agora"; o bit baixo, "foi pressionado
+        // desde a ultima consulta" — este ultimo nao serve, porque consumiria
+        // cliques que o usuario deu no jogo antes de espiar.
+        // SAFETY: leitura de estado global do teclado/mouse.
+        (unsafe { GetAsyncKeyState(virtual_key) } as u16 & 0x8000) != 0
+    }
+
+    /// Marca a janela como "nao ativavel" (`WS_EX_NOACTIVATE`).
+    ///
+    /// E o que deixa o card receber cliques **sem** tirar o jogo do primeiro
+    /// plano. Sem isso, abrir o card faria o alt-tab que a F1 proibe: em
+    /// borderless fullscreen o jogo pisca e, em alguns, minimiza.
+    pub fn set_no_activate(hwnd: isize) -> bool {
+        if hwnd == 0 {
+            return false;
+        }
+        let janela = to_hwnd(hwnd);
+        // SAFETY: `hwnd` e uma janela deste processo; ler e reescrever o estilo
+        // estendido dela e a operacao documentada para este efeito.
+        unsafe {
+            let atual = GetWindowLongPtrW(janela, GWL_EXSTYLE);
+            let novo = atual | WS_EX_NOACTIVATE.0 as isize;
+            SetWindowLongPtrW(janela, GWL_EXSTYLE, novo) != 0 || atual == novo
+        }
+    }
+
     /// Devolve o foco para a janela que o tinha antes do modo lookup.
     ///
     /// Best-effort: o Windows recusa `SetForegroundWindow` quando o processo
@@ -197,9 +238,20 @@ mod imp {
     pub fn exclude_from_capture(_hwnd: isize) -> bool {
         false
     }
+
+    pub fn primary_button_down() -> bool {
+        false
+    }
+
+    pub fn set_no_activate(_hwnd: isize) -> bool {
+        false
+    }
 }
 
-pub use imp::{cursor_pos, exclude_from_capture, foreground_target, restore_foreground};
+pub use imp::{
+    cursor_pos, exclude_from_capture, foreground_target, primary_button_down, restore_foreground,
+    set_no_activate,
+};
 
 #[cfg(test)]
 mod tests {

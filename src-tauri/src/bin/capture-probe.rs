@@ -197,7 +197,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
 
         let comeco = Instant::now();
-        let resultado = papaplay_lib::ocr::recognize(&mut engine, &frame)?;
+        // Sem foco: a sonda quer medir o custo do frame inteiro, nao o da
+        // vizinhanca do cursor que a espiada le.
+        let resultado = papaplay_lib::ocr::recognize(&mut engine, &frame, None)?;
         println!(
             "ocr em {:.1} ms: {} palavras em {} linhas | ram: {:.1} MB\n",
             comeco.elapsed().as_secs_f64() * 1000.0,

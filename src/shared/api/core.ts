@@ -10,6 +10,7 @@ import type {
   OverlayBenchReport,
   OverlayModeChange,
   OverlayStatus,
+  PeekState,
   SaveCardInput,
 } from "../types";
 
@@ -23,16 +24,16 @@ export function ping(): Promise<string> {
   return invoke<string>("ping");
 }
 
-/** Entra (`true`) ou sai (`false`) do modo lookup. */
+/**
+ * Faz a overlay receber (`true`) ou ignorar (`false`) cliques.
+ *
+ * Quem chama e o core, ao abrir e fechar o card — a UI nao decide isso, porque
+ * espiando ela nem recebe mouse. Fica exposto para diagnostico.
+ */
 export function overlaySetMode(
   interactive: boolean,
 ): Promise<OverlayModeChange> {
   return invoke<OverlayModeChange>("overlay_set_mode", { interactive });
-}
-
-/** Inverte o modo atual — mesmo caminho da hotkey `Alt+X`. */
-export function overlayToggle(): Promise<OverlayModeChange> {
-  return invoke<OverlayModeChange>("overlay_toggle");
 }
 
 export function overlayStatus(): Promise<OverlayStatus> {
@@ -87,6 +88,16 @@ export function deckCardStatus(lemma: string): Promise<CardSummary | null> {
   return invoke<CardSummary | null>("deck_card_status", { lemma });
 }
 
+/** Fecha o card e volta ao repouso. E o que o clique fora chama. */
+export function peekClose(): Promise<void> {
+  return invoke<void>("peek_close");
+}
+
+/** Estado da espiada agora — usado so para a UI se sincronizar ao montar. */
+export function peekState(): Promise<PeekState> {
+  return invoke<PeekState>("peek_state");
+}
+
 /** A lista da tela Deck, ja filtrada e ordenada pelo core. */
 export function deckListCards(query: CardQuery): Promise<CardRow[]> {
   return invoke<CardRow[]>("deck_list_cards", { query });
@@ -133,7 +144,12 @@ export function mediaScreenshot(path: string): Promise<ArrayBuffer> {
   return invoke<ArrayBuffer>("media_screenshot", { path });
 }
 
-/** Executa N alternancias seguidas e devolve as estatisticas de latencia. */
+/**
+ * Executa N alternancias seguidas e devolve as estatisticas de latencia.
+ *
+ * Sobrou da spike 01. Nao ha UI para ele desde que a overlay virou "espiar";
+ * fica para medir regressao de latencia pelo console.
+ */
 export function overlayBench(iterations: number): Promise<OverlayBenchReport> {
   return invoke<OverlayBenchReport>("overlay_bench", { iterations });
 }
