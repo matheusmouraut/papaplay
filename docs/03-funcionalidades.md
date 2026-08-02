@@ -99,7 +99,18 @@ Por isso `Alt+C` existe: um atalho registrado com `RegisterHotKey` é **consumid
 
 - Janela principal (não-overlay): abas **Revisar**, **Deck**, **Estatísticas**, **Configurações**.
 - Estatísticas MVP: cards criados/revisados por dia (gráfico simples), taxa de acerto, streak, palavras por jogo.
-- Configurações: hotkeys; aparência do overlay (cor/opacidade dos destaques); limite de cards novos/dia; notificação diária on/off; idioma da UI (PT-BR no MVP); pasta do banco de dados; exportar/importar backup.
+- Configurações: **atalhos**; aparência do overlay (opacidade do tooltip/card); limite de cards novos/dia; notificação diária on/off; idioma da UI (PT-BR no MVP); pasta do banco de dados; exportar/importar backup.
+
+**Atalhos configuráveis (pendente):** hoje `Alt+X` (espiar) e `Alt+C` (abrir o card) estão fixos no código (`hotkeys.rs`). Cada ação precisa da sua própria combinação, editável pelo usuário:
+
+| Ação                   | Padrão  | Observação                                                     |
+| ---------------------- | ------- | -------------------------------------------------------------- |
+| Espiar (segurar)       | `Alt+X` | Precisa de `Pressed` **e** `Released` — teclas mortas não servem |
+| Abrir o card           | `Alt+C` | A rota garantida em jogos de raw input (F1)                     |
+| Salvar sem abrir o card | —       | Ver "salvar sem abrir nada" no roadmap; nasce já configurável   |
+| Fechar o card          | `Esc`   | Só fica registrado com card aberto; conflito é aceitável        |
+
+Requisitos: captura da combinação por gesto ("pressione a tecla desejada"); recusar combinações que o Windows reserva ou que já estão em uso por outra ação nossa; avisar quando o `RegisterHotKey` falhar porque outro app já tomou a combinação (é silencioso hoje); persistir em settings e re-registrar sem reiniciar o app; botão de restaurar padrões.
 - Roda no system tray; iniciar com o Windows (opcional).
 
 ## F7 — Linguagem visual

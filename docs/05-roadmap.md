@@ -13,7 +13,7 @@ Provar os 2 riscos antes de construir o produto:
 
 Tudo do doc 02/03. Ordem sugerida de construção:
 
-1. ✅ Esqueleto Tauri: 2 janelas + tray + hotkeys + settings.
+1. ✅ Esqueleto Tauri: 2 janelas + hotkeys + settings. _(o **tray** nunca foi feito: sem ele, fechar a janela principal deixa o processo vivo por causa da overlay, e não há como sair nem reabrir a janela — ver item 11)_
 2. ✅ Pipeline captura → OCR → posicionamento no overlay.
 3. ✅ Dicionário: script de build (wiktextract → SQLite) + lookup com lematização + tooltip/popup.
 4. ✅ Tradução de frases offline (Marian/Bergamot).
@@ -21,8 +21,9 @@ Tudo do doc 02/03. Ordem sugerida de construção:
 6. ✅ **Interação "espiar" (F1 reescrita)** — segurar `Alt+X` para espiar, soltar para sumir; clique abre o card; overlay nunca rouba o foco; sem caixas em volta das palavras. Substitui o modo lookup persistente. _(validado no app em 2026-08-01)_
 7. ✅ **Qualidade da leitura** — frase de contexto atravessando várias linhas; leitura acompanhando o cursor; modelos quentes (OCR pré-carregado, NMT com descarte por ociosidade em vez de a cada uso).
 8. **Linguagem visual (F7)** — sistema de design minimalista aplicado às duas janelas.
-9. Revisão FSRS + estatísticas + streak.
-10. Onboarding + instalador + polish.
+9. **Atalhos configuráveis (F6)** — uma combinação por ação, editável e persistida; hoje `Alt+X`/`Alt+C` estão fixos no código. Tabela de ações e requisitos na F6 do doc 03.
+10. Revisão FSRS + estatísticas + streak.
+11. Onboarding + instalador + polish — inclui o **tray** que ficou faltando no item 1 (ícone com "Abrir"/"Sair", fechar a janela principal esconde em vez de matar) e o `bundle.resources` do `tauri.conf.json`, hoje vazio: o app só acha dict.db/modelos/nmt (390 MB) porque cai no caminho absoluto do repo compilado junto — em outra máquina não acharia nada.
 
 **Por que 6–8 vêm antes da revisão:** o teste com o app rodando mostrou que o loop de captura funciona mas atrapalha o jogo — e uma ferramenta que quebra a imersão não é usada diariamente, que é justamente o critério de release abaixo. Corrigir a interação vale mais do que empilhar features em cima dela.
 

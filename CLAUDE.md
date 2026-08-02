@@ -21,8 +21,9 @@ Toda a especificação está em `/docs`:
 
 ## Comandos (após bootstrap)
 
-- `pnpm tauri dev` — app em dev
-- `pnpm tauri build` — instalador
+- `pnpm tauri dev` — app em dev (OCR ~3,4x mais lento; medir latência só em release)
+- `pnpm tauri build` — instalador + exe standalone em `src-tauri/target/release/`
+- `pnpm app` / `pnpm app:stop` / `pnpm app:status` — abre/fecha o app já compilado, sem servidor do Vite
 - `pnpm test` — testes da UI · `cargo test` (em `src-tauri/`) — testes do core
 - `pnpm lint && cargo clippy` — lint
 - `pnpm run build:dict` — reconstrói dict.db a partir dos dumps (script em `scripts/`)
