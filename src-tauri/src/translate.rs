@@ -367,25 +367,52 @@ fn intra_threads() -> usize {
 
 static ENGINE: Mutex<Option<Engine>> = Mutex::new(None);
 
-/// Diretorio do modelo: variavel de ambiente, recursos do app, arvore do repo.
+/// Um diretorio so serve se tiver os quatro arquivos.
+///
+/// Checar so o `meta.json` (400 bytes) daria um diretorio "valido" no caso mais
+/// comum de todos depois do instalador enxuto: os acompanhantes copiados e o
+/// download dos `.onnx` ainda por fazer.
+fn completo(dir: &Path) -> bool {
+    ["meta.json", "tokenizer.json", "encoder.onnx", "decoder.onnx"]
+        .iter()
+        .all(|nome| dir.join(nome).is_file())
+}
+
+/// Diretorio do modelo, na ordem em que os candidatos sao tentados:
+/// variavel de ambiente, download do usuario, recursos do app, arvore do repo.
+///
+/// O download vem antes dos recursos porque e ele que existe na maquina de quem
+/// instalou o app: o `.onnx` nao cabe no instalador (ver [`crate::setup`]).
 fn models_dir(app: &AppHandle) -> Result<PathBuf> {
     if let Some(bruto) = std::env::var_os(MODELS_ENV) {
         return Ok(PathBuf::from(bruto));
     }
+    if let Ok(baixado) = crate::setup::destino(app) {
+        if completo(&baixado) {
+            return Ok(baixado);
+        }
+    }
     if let Ok(recursos) = app.path().resource_dir() {
         let candidato = recursos.join("nmt");
-        if candidato.join("meta.json").is_file() {
+        if completo(&candidato) {
             return Ok(candidato);
         }
     }
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/nmt");
-    if repo.join("meta.json").is_file() {
+    if completo(&repo) {
         return Ok(repo);
     }
-    Err(Error::Translate(format!(
-        "modelo de traducao nao encontrado — rode `powershell -File scripts/export-nmt.ps1` \
-         ou aponte {MODELS_ENV} para o diretorio dele"
-    )))
+    Err(Error::Translate(
+        "tradutor de frases nao instalado — instale-o em Configuracoes".into(),
+    ))
+}
+
+/// Ha um tradutor utilizavel em algum dos caminhos conhecidos?
+///
+/// Existe para a tela de setup nao oferecer um download de 332 MB a quem ja tem
+/// o modelo na arvore do repo (o caso do desenvolvimento).
+pub fn modelo_disponivel(app: &AppHandle) -> bool {
+    models_dir(app).is_ok()
 }
 
 /// Quando o modelo carregado foi usado pela ultima vez.

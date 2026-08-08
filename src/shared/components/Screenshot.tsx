@@ -48,7 +48,7 @@ export function Screenshot({ path, alt }: { path: string; alt: string }) {
   }
 
   if (!url) {
-    return <div className="h-16 animate-pulse rounded-md bg-white/5" />;
+    return <div className="h-16 animate-pulse rounded-md bg-papa-raised" />;
   }
 
   return (

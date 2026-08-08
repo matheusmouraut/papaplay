@@ -1,6 +1,9 @@
+import { save } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { deckExportCsv } from "../../shared/api/core";
 import { Screenshot } from "../../shared/components/Screenshot";
+import { Botao, CampoDeTexto, TituloDaTela } from "../../shared/components/ui";
 import {
   useCardDetail,
   useDeckCards,
@@ -95,21 +98,23 @@ export function Deck() {
 
   return (
     <section className="flex h-full flex-col gap-5">
-      <header className="flex items-baseline gap-3">
-        <h2 className="font-reading text-3xl tracking-tight">Deck</h2>
-        <p className="text-sm text-papa-faint">
-          {cards.data
+      <TituloDaTela
+        nota={
+          cards.data
             ? `${cards.data.length} ${cards.data.length === 1 ? "palavra" : "palavras"}`
-            : "carregando…"}
-        </p>
-      </header>
+            : "carregando…"
+        }
+        acao={<ExportarCsv />}
+      >
+        Deck
+      </TituloDaTela>
 
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <CampoDeTexto
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar palavra ou frase…"
-          className="min-w-56 flex-1 rounded-lg border border-papa-border bg-papa-surface px-3 py-2 text-sm outline-none transition-colors duration-150 placeholder:text-papa-faint hover:border-papa-border-strong focus:border-papa-accent/50"
+          className="min-w-56 flex-1"
         />
 
         <Select value={jogo} onChange={setJogo} label="Todos os jogos">
@@ -154,7 +159,7 @@ export function Deck() {
       <div className="flex min-h-0 flex-1 gap-5">
         <div className="min-h-0 flex-1 overflow-auto">
           {cards.isError && (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+            <p className="rounded-lg border border-papa-erro/30 bg-papa-erro-soft px-4 py-3 text-sm text-papa-erro">
               {String(cards.error)}
             </p>
           )}
@@ -232,7 +237,7 @@ function LinhaDoCard({
         type="button"
         onClick={onSelect}
         className={`group flex w-full flex-col items-start gap-1 rounded-lg px-3 py-3 text-left transition-colors duration-150 ${
-          selecionado ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
+          selecionado ? "bg-papa-accent-soft" : "hover:bg-papa-raised"
         }`}
       >
         <div className="flex w-full items-baseline gap-2">
@@ -305,16 +310,15 @@ function Detalhe({
           </p>
 
           <div className="mt-4 flex gap-2">
-            <button
-              type="button"
+            <Botao
+              className="flex-1"
               disabled={suspender.isPending}
               onClick={() =>
                 suspender.mutate({ id: card.id, suspended: !card.suspended })
               }
-              className="flex-1 rounded-lg border border-papa-border px-3 py-1.5 text-sm text-papa-muted transition-colors duration-150 hover:border-papa-border-strong hover:text-papa-text disabled:opacity-50"
             >
               {card.suspended ? "Voltar para a fila" : "Já sei esta"}
-            </button>
+            </Botao>
             <button
               type="button"
               disabled={excluir.isPending}
@@ -322,10 +326,12 @@ function Detalhe({
                 if (confirmando) excluir.mutate(card.id);
                 else setConfirmando(true);
               }}
-              className={`flex-1 rounded-lg border px-3 py-1.5 text-sm transition-colors duration-150 disabled:opacity-50 ${
+              // Fora do `Botao`: destruir é a única ação do app com cor
+              // própria, e ela só existe no segundo clique.
+              className={`flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors duration-150 disabled:opacity-50 ${
                 confirmando
-                  ? "border-red-500/50 bg-red-500/10 text-red-300"
-                  : "border-papa-border text-papa-muted hover:border-papa-border-strong hover:text-papa-text"
+                  ? "border-papa-erro/50 bg-papa-erro-soft text-papa-erro"
+                  : "border-papa-border bg-papa-surface text-papa-text hover:border-papa-border-strong hover:bg-papa-raised"
               }`}
             >
               {confirmando ? "Confirmar exclusão" : "Excluir"}
@@ -378,8 +384,9 @@ function Contexto({ contexto }: { contexto: CardContext }) {
             className="w-full rounded-lg border border-papa-border bg-papa-bg px-2.5 py-1.5 font-reading text-sm outline-none focus:border-papa-accent/50"
           />
           <div className="mt-1.5 flex gap-2">
-            <button
-              type="button"
+            <Botao
+              variante="primario"
+              tamanho="sm"
               disabled={atualizar.isPending}
               onClick={() =>
                 atualizar.mutate(
@@ -387,20 +394,19 @@ function Contexto({ contexto }: { contexto: CardContext }) {
                   { onSuccess: () => setEditando(false) },
                 )
               }
-              className="rounded-md border border-papa-accent/40 px-2.5 py-0.5 text-xs text-papa-accent transition-colors duration-150 hover:bg-papa-accent/10 disabled:opacity-50"
             >
               Salvar
-            </button>
-            <button
-              type="button"
+            </Botao>
+            <Botao
+              variante="sutil"
+              tamanho="sm"
               onClick={() => {
                 setTexto(contexto.sentencePt ?? "");
                 setEditando(false);
               }}
-              className="rounded-md px-2.5 py-0.5 text-xs text-papa-faint transition-colors duration-150 hover:text-papa-text"
             >
               Cancelar
-            </button>
+            </Botao>
           </div>
         </div>
       ) : (
@@ -432,5 +438,59 @@ function Contexto({ contexto }: { contexto: CardContext }) {
         {data(contexto.capturedAt)}
       </p>
     </li>
+  );
+}
+
+/**
+ * Export CSV do deck inteiro (F4).
+ *
+ * O deck é do usuário: ele tem que conseguir levá-lo para o Anki, para uma
+ * planilha ou para outro app sem pedir licença. Exporta tudo, e não o filtro da
+ * tela — quem exporta quer backup, e um backup parcial e silencioso é pior que
+ * nenhum.
+ */
+function ExportarCsv() {
+  const [estado, setEstado] = useState<
+    | { tipo: "ocioso" }
+    | { tipo: "gravando" }
+    | { tipo: "pronto"; linhas: number }
+    | { tipo: "erro"; msg: string }
+  >({ tipo: "ocioso" });
+
+  async function exportar() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const caminho = await save({
+      defaultPath: `papaplay-deck-${hoje}.csv`,
+      filters: [{ name: "CSV", extensions: ["csv"] }],
+    });
+    // `null` é o usuário fechando o diálogo — não é erro, e não merece aviso.
+    if (!caminho) return;
+
+    setEstado({ tipo: "gravando" });
+    try {
+      setEstado({ tipo: "pronto", linhas: await deckExportCsv(caminho) });
+    } catch (erro) {
+      setEstado({ tipo: "erro", msg: String(erro) });
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      {estado.tipo === "pronto" && (
+        <span className="text-xs text-papa-accent">
+          {estado.linhas} {estado.linhas === 1 ? "linha" : "linhas"} exportadas
+        </span>
+      )}
+      {estado.tipo === "erro" && (
+        <span className="text-xs text-papa-erro">{estado.msg}</span>
+      )}
+      <Botao
+        tamanho="sm"
+        disabled={estado.tipo === "gravando"}
+        onClick={exportar}
+      >
+        {estado.tipo === "gravando" ? "gravando…" : "Exportar CSV"}
+      </Botao>
+    </div>
   );
 }

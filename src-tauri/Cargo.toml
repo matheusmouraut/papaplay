@@ -7,6 +7,38 @@ edition = "2021"
 # Com mais de um binario no pacote (ocr-spike, capture-probe) o `cargo run` que
 # o `tauri dev` dispara fica ambiguo e o app nao sobe.
 default-run = "papaplay"
+# Os binarios sao declarados um a um abaixo. Com a descoberta automatica ligada,
+# tudo em `src/bin/` vira alvo padrao — e o bundler do Tauri empacota **todos**
+# os alvos `bin` do pacote no instalador. Foi assim que o `capture-probe.exe`
+# (23 MB de ONNX estatico) entrou num instalador de 35 MB.
+autobins = false
+
+[features]
+default = []
+# Ferramentas de diagnostico que sobraram das spikes: medem latencia de captura,
+# de OCR e de traducao. Uteis para conferir regressao, mas nao sao produto.
+#
+#   cargo run --release --features spikes --bin ocr-spike -- --repeticoes 5
+spikes = []
+
+[[bin]]
+name = "papaplay"
+path = "src/main.rs"
+
+[[bin]]
+name = "capture-probe"
+path = "src/bin/capture-probe.rs"
+required-features = ["spikes"]
+
+[[bin]]
+name = "ocr-spike"
+path = "src/bin/ocr-spike.rs"
+required-features = ["spikes"]
+
+[[bin]]
+name = "nmt-probe"
+path = "src/bin/nmt-probe.rs"
+required-features = ["spikes"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -50,7 +82,7 @@ opt-level = 3
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -64,6 +96,19 @@ thiserror = "2"
 rusqlite = { version = "0.40", features = ["bundled"] }
 
 ort = "=2.0.0-rc.13"
+
+# Download do tradutor no primeiro uso (setup, nunca em runtime — regra 2 do
+# CLAUDE.md). `rustls-tls` em vez do TLS do sistema: uma raiz de confianca so,
+# igual em qualquer maquina. `blocking` porque o download roda na sua propria
+# thread e le em pedacos para reportar progresso — um stream assincrono nao
+# tornaria isso mais simples.
+reqwest = { version = "0.12", default-features = false, features = [
+  "blocking",
+  "rustls-tls",
+] }
+# Verificacao do arquivo baixado. Download truncado por queda de rede e o modo
+# de falha comum, e um .onnx pela metade so falha muito depois, no carregamento.
+sha2 = "0.10"
 
 # Tokenizador do tradutor. `default-features = false` tira o oniguruma (C) e a
 # barra de progresso: o Marian usa Unigram + Metaspace, que sao Rust puro.
@@ -85,6 +130,9 @@ image = { version = "0.25", default-features = false, features = [
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
+# Dialogo nativo de "salvar como" do export CSV (F4). O core escreve o arquivo;
+# o plugin so devolve o caminho que o usuario escolheu.
+tauri-plugin-dialog = "2"
 
 # Monitor da janela em foco, captura de tela e restauracao de foco ao sair do
 # modo lookup. Apenas leitura de estado de janelas alheias e Windows Graphics

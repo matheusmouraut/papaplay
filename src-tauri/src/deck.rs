@@ -215,10 +215,9 @@ pub fn card_status(conexao: &Connection, lemma: &str) -> Result<Option<CardSumma
     }
 }
 
-/// Cards com `fsrs_due` no passado, na ordem em que devem ser revisados.
-pub fn due_cards(_conexao: &Connection, _limit: u32) -> Result<Vec<CardSummary>> {
-    Err(Error::NotImplemented("deck::due_cards"))
-}
+// A fila do dia (cards vencidos + a cota de novos) mora em [`crate::review`]:
+// ela precisa do estado completo do FSRS, e nao do `CardSummary` que este
+// modulo usa para o overlay.
 
 // ---------------------------------------------------------------------------
 // Gestao do deck (F4)
@@ -506,6 +505,70 @@ pub fn delete_card(conexao: &Connection, card_id: i64) -> Result<Vec<String>> {
     Ok(caminhos)
 }
 
+// ---------------------------------------------------------------------------
+// Export CSV (F4)
+// ---------------------------------------------------------------------------
+
+/// Cabecalho do CSV. A ordem e a mesma dos campos em [`linha_csv`].
+const COLUNAS_CSV: &str =
+    "lema,forma,frase,traducao,jogo,capturado_em,estado,repeticoes,lapsos,vencimento";
+
+/// Escapa um campo pela regra do RFC 4180.
+///
+/// Sempre entre aspas, e nao so quando ha virgula: frase de jogo tem virgula,
+/// aspas e — em dialogo com quebra — nova linha, e decidir campo a campo so
+/// cria a chance de errar em um. Aspas internas viram aspas duplas.
+fn campo_csv(valor: &str) -> String {
+    format!("\"{}\"", valor.replace('"', "\"\""))
+}
+
+fn linha_csv(campos: &[&str]) -> String {
+    campos
+        .iter()
+        .map(|campo| campo_csv(campo))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// Monta o CSV do deck inteiro: uma linha por **contexto**, nao por card.
+///
+/// Uma linha por card perderia justamente o que este app tem de diferente — as
+/// frases onde a palavra apareceu. Cards sem contexto ainda saem, com os campos
+/// de frase vazios, para o export nunca esconder uma palavra salva.
+pub fn export_csv(conexao: &Connection) -> Result<String> {
+    let mut stmt = conexao.prepare(
+        "SELECT c.lemma, c.fsrs_state, c.fsrs_reps, c.fsrs_lapses, c.fsrs_due,
+                ctx.form, ctx.sentence_en, ctx.sentence_pt, ctx.game_name, ctx.captured_at
+           FROM cards c
+           LEFT JOIN contexts ctx ON ctx.card_id = c.id
+          ORDER BY c.lemma COLLATE NOCASE, ctx.captured_at, ctx.id",
+    )?;
+
+    let linhas = stmt.query_map([], |linha| {
+        let vazio = String::new();
+        Ok(linha_csv(&[
+            &linha.get::<_, String>(0)?,
+            &linha.get::<_, Option<String>>(5)?.unwrap_or(vazio.clone()),
+            &linha.get::<_, Option<String>>(6)?.unwrap_or(vazio.clone()),
+            &linha.get::<_, Option<String>>(7)?.unwrap_or(vazio.clone()),
+            &linha.get::<_, Option<String>>(8)?.unwrap_or(vazio.clone()),
+            &linha.get::<_, Option<String>>(9)?.unwrap_or(vazio),
+            &linha.get::<_, String>(1)?,
+            &linha.get::<_, u32>(2)?.to_string(),
+            &linha.get::<_, u32>(3)?.to_string(),
+            &linha.get::<_, String>(4)?,
+        ]))
+    })?;
+
+    let mut csv = String::from(COLUNAS_CSV);
+    for linha in linhas {
+        csv.push_str("\r\n");
+        csv.push_str(&linha?);
+    }
+    csv.push_str("\r\n");
+    Ok(csv)
+}
+
 fn contar_contextos(conexao: &Connection, card_id: i64) -> Result<u32> {
     Ok(conexao.query_row(
         "SELECT COUNT(*) FROM contexts WHERE card_id = ?1",
@@ -578,9 +641,10 @@ pub async fn deck_card_status(app: AppHandle, lemma: String) -> Result<Option<Ca
     .map_err(|e| Error::Deck(format!("consulta ao deck abortada: {e}")))?
 }
 
-/// Roda `f` fora da main thread, com a conexao tomada. Todo comando da tela
-/// Deck passa por aqui — nenhum deles pode travar a janela enquanto le disco.
-async fn no_banco<T, F>(app: AppHandle, f: F) -> Result<T>
+/// Roda `f` fora da main thread, com a conexao tomada. Todo comando que toca o
+/// banco do usuario passa por aqui — nenhum deles pode travar a janela enquanto
+/// le disco.
+pub async fn no_banco<T, F>(app: AppHandle, f: F) -> Result<T>
 where
     T: Send + 'static,
     F: FnOnce(&AppHandle, &Connection) -> Result<T> + Send + 'static,
@@ -637,6 +701,27 @@ pub async fn deck_delete_card(app: AppHandle, card_id: i64) -> Result<()> {
             }
         }
         Ok(())
+    })
+    .await
+}
+
+/// Escreve o CSV do deck no caminho que o usuario escolheu no dialogo.
+///
+/// Devolve quantas linhas de dados foram gravadas, para a UI dizer "42 linhas
+/// exportadas" em vez de um "pronto" que nao prova nada.
+///
+/// O BOM de UTF-8 na frente e por causa do Excel: sem ele, "espião" abre como
+/// "espiÃ£o" na maquina de quem vai de fato usar o arquivo.
+#[tauri::command]
+pub async fn deck_export_csv(app: AppHandle, path: String) -> Result<u32> {
+    no_banco(app, move |_, conexao| {
+        let csv = export_csv(conexao)?;
+        let mut bytes = Vec::with_capacity(csv.len() + 3);
+        bytes.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+        bytes.extend_from_slice(csv.as_bytes());
+        std::fs::write(&path, bytes).map_err(|e| Error::Deck(format!("nao gravou {path}: {e}")))?;
+        // Menos o cabecalho e a linha em branco do fim.
+        Ok(csv.lines().count().saturating_sub(1) as u32)
     })
     .await
 }
@@ -856,7 +941,7 @@ mod tests {
         save_card(&conexao, &entrada("run", "running", "She is running.")).expect("salvou");
         conexao
             .execute(
-                "UPDATE contexts SET captured_at = '2026-08-02T00:00:00Z'
+                "UPDATE contexts SET captured_at = '9999-01-01T00:00:00Z'
                   WHERE sentence_en = 'She is running.'",
                 [],
             )
@@ -943,7 +1028,10 @@ mod tests {
             )
             .expect("ordenou")
         };
-        assert_eq!(lemas(&ordenar(Ordem::Alfabetica)), ["blade", "dread", "run"]);
+        assert_eq!(
+            lemas(&ordenar(Ordem::Alfabetica)),
+            ["blade", "dread", "run"]
+        );
         assert_eq!(
             lemas(&ordenar(Ordem::Vencimento))[0],
             "run",
@@ -958,7 +1046,7 @@ mod tests {
         save_card(&conexao, &entrada("run", "running", "She is running.")).expect("salvou");
         conexao
             .execute(
-                "UPDATE contexts SET captured_at = '2026-08-02T00:00:00Z'
+                "UPDATE contexts SET captured_at = '9999-01-01T00:00:00Z'
                   WHERE sentence_en = 'She is running.'",
                 [],
             )
@@ -1053,5 +1141,50 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM contexts", [], |l| l.get(0))
             .expect("contou");
         assert_eq!(sobraram, 0);
+    }
+
+    #[test]
+    fn o_csv_sai_com_cabecalho_e_uma_linha_por_contexto() {
+        let conexao = banco();
+        save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        save_card(&conexao, &entrada("run", "running", "She is running.")).expect("salvou");
+        save_card(&conexao, &entrada("dread", "dread", "A dread silence.")).expect("salvou");
+
+        let csv = export_csv(&conexao).expect("exportou");
+        let linhas: Vec<&str> = csv.lines().collect();
+        assert_eq!(linhas[0], COLUNAS_CSV);
+        assert_eq!(linhas.len(), 4);
+        // Ordenado por lema: "dread" antes de "run".
+        assert!(linhas[1].starts_with("\"dread\""));
+    }
+
+    #[test]
+    fn o_csv_escapa_aspas_e_virgulas_da_frase() {
+        let conexao = banco();
+        save_card(
+            &conexao,
+            &entrada("say", "said", "He said \"run\", and I ran."),
+        )
+        .expect("salvou");
+
+        let csv = export_csv(&conexao).expect("exportou");
+        assert!(
+            csv.contains("\"He said \"\"run\"\", and I ran.\""),
+            "aspas internas precisam virar aspas duplas: {csv}"
+        );
+    }
+
+    #[test]
+    fn card_sem_contexto_ainda_aparece_no_csv() {
+        let conexao = banco();
+        let salvo = save_card(&conexao, &entrada("run", "ran", "He ran away.")).expect("salvou");
+        conexao
+            .execute("DELETE FROM contexts WHERE card_id = ?1", [salvo.resumo.id])
+            .expect("apagou o contexto");
+
+        let csv = export_csv(&conexao).expect("exportou");
+        let linhas: Vec<&str> = csv.lines().collect();
+        assert_eq!(linhas.len(), 2);
+        assert!(linhas[1].starts_with("\"run\",\"\",\"\""));
     }
 }

@@ -381,11 +381,7 @@ pub fn expand_stored(
         if guarda.is_none() {
             *guarda = Some(Engine::load(&models_dir(app)?)?);
         }
-        ocr::recognize(
-            guarda.as_mut().expect("engine carregada"),
-            &frame,
-            foco,
-        )?
+        ocr::recognize(guarda.as_mut().expect("engine carregada"), &frame, foco)?
     };
 
     Ok(Some(montar(resultado, frame, target)))
@@ -420,7 +416,9 @@ pub fn preload_engine(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {
         let Ok(dir) = models_dir(&app) else { return };
-        let Ok(engine) = Engine::load(&dir) else { return };
+        let Ok(engine) = Engine::load(&dir) else {
+            return;
+        };
         if let Ok(mut guarda) = ENGINE.lock() {
             // So preenche se ninguem chegou antes: uma espiada disparada
             // durante o boot ja carregou o que precisava.

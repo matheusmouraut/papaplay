@@ -101,7 +101,7 @@ Por isso `Alt+C` existe: um atalho registrado com `RegisterHotKey` é **consumid
 - Estatísticas MVP: cards criados/revisados por dia (gráfico simples), taxa de acerto, streak, palavras por jogo.
 - Configurações: **atalhos**; aparência do overlay (opacidade do tooltip/card); limite de cards novos/dia; notificação diária on/off; idioma da UI (PT-BR no MVP); pasta do banco de dados; exportar/importar backup.
 
-**Atalhos configuráveis (pendente):** hoje `Alt+X` (espiar) e `Alt+C` (abrir o card) estão fixos no código (`hotkeys.rs`). Cada ação precisa da sua própria combinação, editável pelo usuário:
+**Atalhos configuráveis (feito):** capturados por gesto na tela de Configurações, validados e re-registrados sem reiniciar (`settings.rs` + `hotkeys::reregister`). "Salvar sem abrir o card" continua no backlog — quando existir, nasce configurável como o resto.
 
 | Ação                   | Padrão  | Observação                                                     |
 | ---------------------- | ------- | -------------------------------------------------------------- |
@@ -110,12 +110,17 @@ Por isso `Alt+C` existe: um atalho registrado com `RegisterHotKey` é **consumid
 | Salvar sem abrir o card | —       | Ver "salvar sem abrir nada" no roadmap; nasce já configurável   |
 | Fechar o card          | `Esc`   | Só fica registrado com card aberto; conflito é aceitável        |
 
-Requisitos: captura da combinação por gesto ("pressione a tecla desejada"); recusar combinações que o Windows reserva ou que já estão em uso por outra ação nossa; avisar quando o `RegisterHotKey` falhar porque outro app já tomou a combinação (é silencioso hoje); persistir em settings e re-registrar sem reiniciar o app; botão de restaurar padrões.
-- Roda no system tray; iniciar com o Windows (opcional).
+Requisitos: captura da combinação por gesto ("pressione a tecla desejada"); recusar combinações que o Windows reserva ou que já estão em uso por outra ação nossa; avisar quando o `RegisterHotKey` falhar porque outro app já tomou a combinação; persistir em settings e re-registrar sem reiniciar o app; botão de restaurar padrões.
+
+**Ciclo de vida:** ícone na bandeja com "Abrir" e "Sair" enquanto o app roda. **Fechar a janela principal encerra o processo** — decisão de produto de 2026-08-08, contra o padrão de "esconder na bandeja": um app que continua vivo depois do "x" é um app que o usuário não confia ter fechado. Para espiar durante o jogo, ele fica aberto (minimizado basta). Iniciar com o Windows continua no backlog.
 
 ## F7 — Linguagem visual
 
-**Referência:** editores de texto modernos e minimalistas (Notion, Linear, Bear) — não "HUD de jogo", não painel de ferramenta.
+**Referência:** editores de texto modernos e minimalistas (Notion, Linear, Bear) em paleta pastel, na linha de lookupper.com — não "HUD de jogo", não painel de ferramenta.
+
+**Dois ambientes, um jogo de tokens (decidido em 2026-08-08):** a janela principal é **clara** (creme `#fbf8f3`, cartões brancos, verde-papagaio `#257e5f` como acento único) e a overlay é **escura** (vidro sobre a cena do jogo). Não é inconsistência: uma overlay clara sobre um jogo escuro cega quem está jogando. Os dois lados usam os mesmos nomes de token — `src/shared/styles/overlay.css` redefine os valores, e nenhum componente compartilhado precisa saber onde está.
+
+**Marca:** papagaio de perfil cujo bico é o triângulo de play (`src/assets/logo.svg`) — o pássaro que repete o que ouve e o botão que começa o jogo, na mesma forma. Coral e amarelo existem só na marca; colorir dado com eles quebraria a regra do acento único.
 
 - **Tipografia primeiro:** o conteúdo é texto (frase, tradução, acepção). Fonte de interface neutra, tamanho generoso, entrelinha 1.5, hierarquia por peso e cor — não por caixinha.
 - **Cromatismo contido:** dois tons de fundo, uma borda sutil, um acento só. Cor tem significado (acerto, erro, salvo), nunca decoração.
@@ -128,5 +133,6 @@ Requisitos: captura da combinação por gesto ("pressione a tecla desejada"); re
 
 ## F8 — Onboarding
 
-- Wizard de 3 passos na primeira execução: (1) configurar hotkey, (2) playground embutido — uma imagem de tela de jogo dentro do app para treinar o lookup sem abrir jogo, (3) explicação do loop de revisão.
+- Wizard na primeira execução: (1) o gesto e os atalhos, (2) **download do tradutor de frases** — pulável, ver abaixo, (3) playground embutido: uma imagem de tela de jogo dentro do app para treinar o lookup sem abrir jogo, (4) explicação do loop de revisão.
+- O passo (2) não estava no plano original: ele nasceu quando os 332 MB do tradutor saíram do instalador (`src-tauri/src/setup.rs`). É o único passo pulável, porque é o único que não impede o app de funcionar.
 - Meta: primeiro lookup bem-sucedido em <2 minutos após instalar.

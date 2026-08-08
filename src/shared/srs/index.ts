@@ -16,7 +16,13 @@ import {
   type RecordLogItem,
 } from "ts-fsrs";
 
-import type { DeckCard, FsrsFields, FsrsState } from "../types";
+import type {
+  DeckCard,
+  FsrsFields,
+  FsrsState,
+  ReviewInput,
+  ReviewLogEntry,
+} from "../types";
 
 export { Rating, State };
 export type { FsrsCard, Grade, RecordLogItem };
@@ -132,9 +138,84 @@ export function toFsrsCard(card: DeckCard): FsrsCard {
   };
 }
 
+/**
+ * Uma nota do usuario, pronta para o `review_apply` do core.
+ *
+ * Concentra num lugar só as três coisas que precisam concordar entre si: o novo
+ * estado do card, a linha do histórico e o `elapsed_days` que o FSRS usou no
+ * cálculo. Montar isso na tela abriria a chance de gravar um log que não
+ * corresponde ao agendamento que foi salvo.
+ */
+export function gradeCard(
+  card: DeckCard,
+  grade: Grade,
+  now: Date = new Date(),
+): ReviewInput {
+  const atual = toFsrsCard(card);
+  const { card: proximo, log } = review(atual, grade, now);
+  const entrada: ReviewLogEntry = {
+    reviewedAt: now.toISOString(),
+    rating: grade,
+    elapsedDays: log.elapsed_days,
+    stateBefore: card.fsrsState,
+    stateAfter: STATE_TO_STRING[proximo.state],
+  };
+  return { cardId: card.id, fsrs: toFsrsFields(proximo), log: entrada };
+}
+
+/**
+ * O que cada botao promete: quando o card volta se o usuario der aquela nota.
+ *
+ * Ver o intervalo antes de responder é o que ensina o usuário a usar "Difícil"
+ * e "Fácil" em vez de só "Bom" — sem isso as quatro notas viram duas.
+ */
+export function intervalLabels(
+  card: DeckCard,
+  now: Date = new Date(),
+): Record<Grade, string> {
+  const previa = preview(toFsrsCard(card), now);
+  const rotulos = {} as Record<Grade, string>;
+  for (const grade of RATINGS) {
+    rotulos[grade] = distanciaAte(previa[grade].card.due, now);
+  }
+  return rotulos;
+}
+
+/**
+ * "10 min", "2 d", "3 mes" — a distancia ate a proxima aparicao do card.
+ *
+ * Arredonda para a maior unidade que ainda descreve o intervalo: nos passos de
+ * aprendizado o que importa são os minutos, e em revisão madura ninguém lê
+ * "43800 min".
+ */
+function distanciaAte(due: Date, agora: Date): string {
+  const minutos = Math.max(
+    1,
+    Math.round((due.getTime() - agora.getTime()) / 60000),
+  );
+  if (minutos < 60) return `${minutos} min`;
+  const horas = Math.round(minutos / 60);
+  if (horas < 24) return `${horas} h`;
+  const dias = Math.round(minutos / 1440);
+  if (dias < 31) return `${dias} d`;
+  const meses = Math.round(dias / 30);
+  if (meses < 12) return `${meses} mes`;
+  return `${(dias / 365).toFixed(1).replace(".", ",")} anos`;
+}
+
 /** Aplica um card do ts-fsrs de volta sobre o registro persistido. */
 export function fromFsrsCard(card: DeckCard, next: FsrsCard): DeckCard {
-  const campos = toFsrsFields(next);
+  return withFsrsFields(card, toFsrsFields(next));
+}
+
+/**
+ * Carimba no card os campos que acabaram de ser gravados.
+ *
+ * A sessao de revisao usa isso para reenfileirar um card errado sem recarregar
+ * a fila: o card volta ao fim da lista ja com o estado novo, e a segunda
+ * tentativa e calculada em cima do agendamento correto.
+ */
+export function withFsrsFields(card: DeckCard, campos: FsrsFields): DeckCard {
   return {
     ...card,
     fsrsDue: campos.due,

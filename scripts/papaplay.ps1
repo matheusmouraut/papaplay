@@ -43,8 +43,9 @@ function Stop-App {
         Write-Host 'PapaPlay nao esta rodando.'
         return
     }
-    # Sem tray e sem quit-on-close, fechar a janela principal deixa o processo
-    # vivo por causa da overlay: matar e o unico caminho por enquanto.
+    # Fechar a janela principal ja encerra o processo (ver src/tray.rs); este
+    # caminho existe para o script nao depender de uma janela visivel -- app
+    # travado ou minimizado na bandeja tambem precisa fechar por aqui.
     $app | Stop-Process -Force
     Write-Host ('PapaPlay fechado (pid ' + ($app.Id -join ', ') + ').')
 }

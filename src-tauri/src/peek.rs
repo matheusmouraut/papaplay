@@ -238,12 +238,11 @@ fn seguir_o_cursor(app: &AppHandle, geracao: u64) -> Result<()> {
             continue;
         };
 
-        let ocioso = sem_palavra_desde.is_some_and(|desde| desde.elapsed() >= PACIENCIA_SEM_PALAVRA);
+        let ocioso =
+            sem_palavra_desde.is_some_and(|desde| desde.elapsed() >= PACIENCIA_SEM_PALAVRA);
         let precisa = match &leitura {
             None => true,
-            Some(lida) => {
-                ocioso || precisa_reler(lida.region, alvo.monitor, cursor, PEEK_REGION)
-            }
+            Some(lida) => ocioso || precisa_reler(lida.region, alvo.monitor, cursor, PEEK_REGION),
         };
         let pode = ultima_leitura.is_none_or(|quando| quando.elapsed() >= INTERVALO_MINIMO);
 
@@ -498,7 +497,12 @@ mod tests {
         // levar o mouse para outro deixava de responder.
         let lida = regiao(680, 510);
         let perto_da_direita = (680 + PEEK_REGION.0 as i32 - 20, 510 + 210);
-        assert!(precisa_reler(lida, monitor(), perto_da_direita, PEEK_REGION));
+        assert!(precisa_reler(
+            lida,
+            monitor(),
+            perto_da_direita,
+            PEEK_REGION
+        ));
     }
 
     #[test]

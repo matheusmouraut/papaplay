@@ -10,9 +10,12 @@ pub mod ocr;
 pub mod overlay;
 pub mod peek;
 pub mod platform;
+pub mod review;
+pub mod settings;
+pub mod setup;
+pub mod stats;
 pub mod translate;
-
-use tauri::Manager;
+pub mod tray;
 
 /// Health-check do core. As telas placeholder chamam este comando para
 /// provar que a ponte UI <-> Rust esta de pe.
@@ -30,13 +33,10 @@ pub fn run() {
         builder = builder
             .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
                 // Segunda instancia: traz a janela principal de volta.
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_focus();
-                }
+                tray::open_main(app);
             }))
-            .plugin(tauri_plugin_global_shortcut::Builder::new().build());
+            .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+            .plugin(tauri_plugin_dialog::init());
     }
 
     builder
@@ -44,6 +44,7 @@ pub fn run() {
         .setup(|app| {
             // A overlay comeca visivel e passiva — esse e o estado de repouso.
             overlay::init(app.handle())?;
+            tray::init(app.handle())?;
             hotkeys::register(app.handle())?;
             // Em segundo plano, para a primeira espiada nao esperar por disco
             // nem pela criacao do device de captura.
@@ -72,7 +73,18 @@ pub fn run() {
             deck::deck_set_suspended,
             deck::deck_update_context,
             deck::deck_delete_card,
+            deck::deck_export_csv,
+            review::review_queue,
+            review::review_apply,
+            stats::stats_summary,
             media::media_screenshot,
+            settings::settings_get_shortcuts,
+            settings::settings_set_shortcuts,
+            settings::settings_reset_shortcuts,
+            settings::settings_get_preferences,
+            settings::settings_set_preferences,
+            setup::nmt_status,
+            setup::nmt_install,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

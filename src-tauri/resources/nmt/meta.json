@@ -1,0 +1,11 @@
+{
+  "model": "Helsinki-NLP/opus-mt-tc-big-en-pt",
+  "license": "CC BY 4.0 (Helsinki-NLP / OPUS-MT)",
+  "decoderStartTokenId": 54775,
+  "eosTokenId": 44670,
+  "padTokenId": 54775,
+  "vocabSize": 54776,
+  "decoderLayers": 6,
+  "decoderAttentionHeads": 16,
+  "headDim": 64
+}

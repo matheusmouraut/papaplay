@@ -7,11 +7,19 @@ import type {
   CardSummary,
   DictEntry,
   LookupResult,
+  NmtStatus,
   OverlayBenchReport,
   OverlayModeChange,
   OverlayStatus,
   PeekState,
+  Preferences,
+  QueueQuery,
+  ReviewInput,
+  ReviewQueue,
   SaveCardInput,
+  Shortcuts,
+  StatsQuery,
+  StatsSummary,
 } from "../types";
 
 /**
@@ -152,4 +160,87 @@ export function mediaScreenshot(path: string): Promise<ArrayBuffer> {
  */
 export function overlayBench(iterations: number): Promise<OverlayBenchReport> {
   return invoke<OverlayBenchReport>("overlay_bench", { iterations });
+}
+
+/** Os atalhos salvos agora, ou os padrões na primeira execução. */
+export function settingsGetShortcuts(): Promise<Shortcuts> {
+  return invoke<Shortcuts>("settings_get_shortcuts");
+}
+
+/**
+ * Valida, persiste e re-registra os atalhos globais — sem reiniciar o app.
+ *
+ * Rejeita combinações malformadas e combinações repetidas entre `lookup` e
+ * `card` antes mesmo de chamar o Windows; uma combinação já tomada por outro
+ * app só falha aqui dentro, no `RegisterHotKey` (core, `hotkeys::reregister`).
+ */
+export function settingsSetShortcuts(shortcuts: Shortcuts): Promise<Shortcuts> {
+  return invoke<Shortcuts>("settings_set_shortcuts", { shortcuts });
+}
+
+/** Volta `lookup`/`card` para Alt+X / Alt+C. */
+export function settingsResetShortcuts(): Promise<Shortcuts> {
+  return invoke<Shortcuts>("settings_reset_shortcuts");
+}
+
+/** O tradutor de frases já está instalado nesta máquina? */
+export function nmtStatus(): Promise<NmtStatus> {
+  return invoke<NmtStatus>("nmt_status");
+}
+
+/**
+ * Baixa o tradutor de frases (~332 MB), emitindo `setup://nmt` a cada pedaço.
+ *
+ * É a única chamada de rede do app, e ela só acontece por ação explícita do
+ * usuário no setup — o resto funciona com o cabo desconectado.
+ */
+export function nmtInstall(): Promise<NmtStatus> {
+  return invoke<NmtStatus>("nmt_install");
+}
+
+/** Preferências salvas, ou os padrões na primeira execução. */
+export function settingsGetPreferences(): Promise<Preferences> {
+  return invoke<Preferences>("settings_get_preferences");
+}
+
+/** Grava e devolve o que ficou salvo — `newPerDay` volta já limitado a 1..200. */
+export function settingsSetPreferences(
+  preferences: Preferences,
+): Promise<Preferences> {
+  return invoke<Preferences>("settings_set_preferences", { preferences });
+}
+
+/**
+ * A fila do dia: cards vencidos + a cota de novos que ainda sobrou.
+ *
+ * O `now`/`dayStart` vêm daqui, e não do core, porque só a UI sabe o fuso do
+ * usuário — "novos por dia" é uma pergunta sobre o dia local.
+ */
+export function reviewQueue(query: QueueQuery): Promise<ReviewQueue> {
+  return invoke<ReviewQueue>("review_queue", { query });
+}
+
+/**
+ * Grava a nota: novo agendamento no card e uma linha no histórico.
+ *
+ * O `input.fsrs` tem que vir do wrapper em `src/shared/srs` — o core persiste
+ * sem calcular nada (regra inviolável #4).
+ */
+export function reviewApply(input: ReviewInput): Promise<void> {
+  return invoke<void>("review_apply", { input });
+}
+
+/** Números da tela de Estatísticas, já agregados pelo core. */
+export function statsSummary(query: StatsQuery): Promise<StatsSummary> {
+  return invoke<StatsSummary>("stats_summary", { query });
+}
+
+/**
+ * Escreve o CSV do deck no caminho escolhido e devolve quantas linhas gravou.
+ *
+ * Uma linha por contexto, não por card: a frase onde a palavra apareceu é o que
+ * este deck tem que uma lista de vocabulário não tem.
+ */
+export function deckExportCsv(path: string): Promise<number> {
+  return invoke<number>("deck_export_csv", { path });
 }

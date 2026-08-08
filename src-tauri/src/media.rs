@@ -152,8 +152,7 @@ fn nome_de_arquivo(relativo: &str) -> Result<&Path> {
 /// Bytes do screenshot, para a UI mostrar a imagem.
 pub fn ler(app: &AppHandle, relativo: &str) -> Result<Vec<u8>> {
     let caminho = resolver(app, relativo)?;
-    std::fs::read(&caminho)
-        .map_err(|e| Error::Media(format!("nao leu {}: {e}", caminho.display())))
+    std::fs::read(&caminho).map_err(|e| Error::Media(format!("nao leu {}: {e}", caminho.display())))
 }
 
 /// Apaga o arquivo de um contexto que deixou de existir. Arquivo ausente nao e

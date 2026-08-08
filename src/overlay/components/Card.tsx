@@ -186,7 +186,7 @@ function Verbete({
             {frase}
           </p>
           {traducao.erro ? (
-            <p className="mt-1.5 text-xs text-red-300/90">{traducao.erro}</p>
+            <p className="mt-1.5 text-xs text-papa-erro">{traducao.erro}</p>
           ) : (
             <p className="mt-1.5 font-reading text-sm leading-relaxed text-papa-muted">
               {traducao.texto ?? (traducao.carregando ? "traduzindo…" : null)}
@@ -204,10 +204,13 @@ function Verbete({
             ? "Já está no deck. Clique para anexar esta frase ao card."
             : undefined
         }
-        className={`mt-4 w-full rounded-lg border px-3 py-2 text-sm transition-colors duration-150 disabled:opacity-50 ${
+        // Mesmo raio e mesma transição do `Botao` da janela principal
+        // (`src/shared/components/ui.tsx`); o fundo é que difere, porque aqui
+        // ele está sobre vidro e não sobre a superfície do app.
+        className={`mt-4 w-full rounded-md border px-3 py-2 text-sm transition-colors duration-150 disabled:opacity-50 ${
           salvo !== null
             ? "border-papa-accent/40 bg-papa-accent/10 text-papa-accent"
-            : "border-papa-border-strong text-papa-text hover:bg-white/[0.06]"
+            : "border-papa-border-strong text-papa-text hover:bg-papa-raised"
         }`}
       >
         {salvando
@@ -219,7 +222,7 @@ function Verbete({
       </button>
 
       {erroAoSalvar && (
-        <p className="mt-1.5 text-xs text-red-300/90">{erroAoSalvar}</p>
+        <p className="mt-1.5 text-xs text-papa-erro">{erroAoSalvar}</p>
       )}
 
       {/* Deliberadamente fora do fluxo do card: o usuário salvou a palavra

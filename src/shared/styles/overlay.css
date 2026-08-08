@@ -1,6 +1,38 @@
 @import "tailwindcss";
 @import "./theme.css";
 
+/* A overlay é o mesmo produto num ambiente oposto: ela flutua sobre a cena do
+ * jogo, e um cartão creme sobre um jogo escuro cega quem está jogando.
+ *
+ * Em vez de um segundo conjunto de classes, redefinimos os mesmos tokens. O
+ * Tailwind v4 emite `color: var(--color-papa-text)`, então trocar a variável
+ * troca o tema inteiro — `text-papa-text` continua sendo "o texto que se lê"
+ * nas duas janelas, e nenhum componente compartilhado precisa saber onde está.
+ *
+ * O que **não** muda de valor: a tipografia, os raios, a duração das
+ * transições e o significado do acento. É isso que faz um print do Deck e um
+ * print do card parecerem o mesmo produto (critério de aceite da F7). */
+:root {
+  --color-papa-bg: #14161a;
+  --color-papa-surface: #1b1e24;
+  --color-papa-raised: #23272f;
+  --color-papa-border: #2c313a;
+  --color-papa-border-strong: #3b424e;
+
+  --color-papa-text: #f2efe9;
+  --color-papa-muted: #a9a29b;
+  --color-papa-faint: #7e7770;
+
+  /* O verde da janela principal (#257e5f) some sobre preto. Sobre o jogo o
+     acento precisa ser o pastel claro — é o mesmo hue, um degrau de luz do
+     outro lado. */
+  --color-papa-accent: #8fd3b0;
+  --color-papa-accent-soft: #2e5a48;
+
+  --color-papa-erro: #f0a89f;
+  --color-papa-erro-soft: #3a201d;
+}
+
 /* A janela overlay precisa ser totalmente transparente: nada de background
    herdado do reset do Tailwind, senao o click-through fica visivel. */
 html,

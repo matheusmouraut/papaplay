@@ -23,8 +23,19 @@ imagens/
 # modelos de OCR: 11 MB de binário, refeitos por scripts/fetch-ocr-models.ps1
 src-tauri/resources/models/
 
-# modelos de tradução: ~350 MB, refeitos por scripts/export-nmt.ps1
-src-tauri/resources/nmt/
+# Modelos de tradução: os dois .onnx são ~330 MB, refeitos por
+# scripts/export-nmt.ps1 e baixados pelo app no setup (src-tauri/src/setup.rs).
+#
+# O meta.json e o tokenizer.json ficam **no git**: eles vão dentro do
+# instalador, e o build não pode depender de rodar um export de 330 MB em Python
+# para conseguir 3,7 MB de tokenizador. São o contrato entre o app e o modelo, e
+# versioná-los junto do código é o que impede "app novo, tokenizador velho".
+#
+# Ignora o conteúdo, e não a pasta: o git não readmite um arquivo cujo diretório
+# pai está excluído.
+src-tauri/resources/nmt/*
+!src-tauri/resources/nmt/meta.json
+!src-tauri/resources/nmt/tokenizer.json
 
 # saída visual do `ocr-spike --desenhar`, regerável a partir da fixture
 *.boxes.png

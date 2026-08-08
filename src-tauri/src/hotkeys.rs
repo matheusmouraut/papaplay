@@ -18,44 +18,40 @@
 //! (menu de pausa pararia de abrir). Por isso ele so fica registrado enquanto
 //! ha um card aberto para ele fechar — ver [`sync_escape`].
 
+use std::str::FromStr;
+use std::sync::Mutex;
+
 use tauri::AppHandle;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::peek;
+use crate::settings::{self, Shortcuts};
 
-/// Atalho padrao da espiada. Configuravel depois.
+/// Atalho padrao da espiada. Configuravel pela tela de Configuracoes (F6).
 pub const DEFAULT_LOOKUP_SHORTCUT: &str = "Alt+X";
 
-/// Atalho que abre o card sem usar o mouse.
+/// Atalho que abre o card sem usar o mouse. Configuravel pela tela de
+/// Configuracoes (F6).
 pub const DEFAULT_CARD_SHORTCUT: &str = "Alt+C";
 
-/// Segurar espia; soltar volta ao repouso.
-pub fn lookup_shortcut() -> Shortcut {
-    Shortcut::new(Some(Modifiers::ALT), Code::KeyX)
-}
+/// Os atalhos de fato registrados agora — para o `unregister` do
+/// [`reregister`] saber o que tirar antes de por os novos.
+static ATIVOS: Mutex<Option<Shortcuts>> = Mutex::new(None);
 
-/// Abre o card da palavra sob o cursor.
-///
-/// # Por que existe, se o clique ja faz isso
-///
-/// Porque o clique nem sempre pode ser impedido de chegar ao jogo. Jogos que
-/// leem raw input recebem o botao do mouse pelo **foco**, e a overlay nunca
-/// tira o foco do jogo — entao clicar numa palavra num FPS tambem atira.
-///
-/// Uma tecla registrada aqui nao tem esse problema: o `RegisterHotKey` do
-/// Windows **consome** a combinacao, e o jogo nunca a ve. E o mesmo motivo de
-/// o `Alt+X` nao digitar "x" no jogo.
-///
-/// `Alt+C` e nao apenas `C` porque a mao ja esta com o Alt pressionado
-/// espiando, e um `C` solto seria roubado do jogo o tempo todo.
-pub fn card_shortcut() -> Shortcut {
-    Shortcut::new(Some(Modifiers::ALT), Code::KeyC)
-}
-
-/// Fecha o card aberto.
+/// Fecha o card aberto. Sem modificador de proposito (regra de UX, nao
+/// tecnica): e o unico atalho que nunca colide com `lookup`/`card`, entao fica
+/// de fora da configuracao — ver o comentario em [`crate::settings::Shortcuts`].
 pub fn escape_shortcut() -> Shortcut {
     Shortcut::new(None, Code::Escape)
+}
+
+/// Converte a combinacao salva ("Alt+X") num `Shortcut`, com uma mensagem que
+/// a UI pode mostrar direto — quem digitou uma combinacao invalida vai ver
+/// esta string, nao um erro interno do parser.
+pub fn validar(combinacao: &str) -> Result<Shortcut> {
+    Shortcut::from_str(combinacao)
+        .map_err(|e| Error::Platform(format!("atalho \"{combinacao}\" invalido: {e}")))
 }
 
 /// Roda `f` fora da thread de hotkeys.
@@ -68,27 +64,52 @@ fn fora_da_thread_de_hotkeys(app: &AppHandle, f: impl FnOnce(&AppHandle) + Send 
     tauri::async_runtime::spawn_blocking(move || f(&app));
 }
 
-/// Registra os atalhos globais no start do app.
+/// Registra os atalhos globais no start do app, lendo a combinacao salva (ou
+/// os padroes, na primeira execucao).
 pub fn register(app: &AppHandle) -> Result<()> {
+    aplicar(app, settings::ler_atalhos(app)?)
+}
+
+/// Registra `lookup`/`card` e guarda em [`ATIVOS`] o que ficou de pe — e o que
+/// [`reregister`] usa depois para saber o que desregistrar primeiro.
+fn aplicar(app: &AppHandle, shortcuts: Shortcuts) -> Result<()> {
     let manager = app.global_shortcut();
 
-    manager.on_shortcut(lookup_shortcut(), |app, _shortcut, event| {
-        match event.state() {
+    manager.on_shortcut(
+        validar(&shortcuts.lookup)?,
+        |app, _shortcut, event| match event.state() {
             ShortcutState::Pressed => fora_da_thread_de_hotkeys(app, peek::begin),
             ShortcutState::Released => fora_da_thread_de_hotkeys(app, peek::release),
-        }
-    })?;
+        },
+    )?;
 
     // Fica registrado o tempo todo, e nao so durante a espiada: registrar sob
     // demanda custaria alguns milissegundos no meio do gesto, e `Alt+C` nao e
     // uma combinacao que jogo nenhum vai sentir falta.
-    manager.on_shortcut(card_shortcut(), |app, _shortcut, event| {
+    manager.on_shortcut(validar(&shortcuts.card)?, |app, _shortcut, event| {
         if event.state() == ShortcutState::Pressed {
             fora_da_thread_de_hotkeys(app, peek::open_card);
         }
     })?;
 
+    *ATIVOS.lock().expect("mutex dos atalhos envenenado") = Some(shortcuts);
     Ok(())
+}
+
+/// Troca `lookup`/`card` por uma combinacao nova sem reiniciar o app: tira as
+/// que estao registradas agora e poe as novas no lugar.
+///
+/// `Esc` fica de fora (ver [`escape_shortcut`]) — nada aqui mexe nele.
+pub fn reregister(app: &AppHandle, shortcuts: Shortcuts) -> Result<()> {
+    let anteriores = ATIVOS
+        .lock()
+        .expect("mutex dos atalhos envenenado")
+        .clone()
+        .unwrap_or_default();
+    let manager = app.global_shortcut();
+    manager.unregister(validar(&anteriores.lookup)?)?;
+    manager.unregister(validar(&anteriores.card)?)?;
+    aplicar(app, shortcuts)
 }
 
 /// Mantem o `Esc` global registrado apenas enquanto ha card aberto.
@@ -113,13 +134,13 @@ pub fn sync_escape(app: &AppHandle, interactive: bool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tauri_plugin_global_shortcut::Modifiers;
 
     #[test]
-    fn atalho_de_lookup_bate_com_a_constante_documentada() {
-        let shortcut = lookup_shortcut();
+    fn atalho_de_lookup_padrao_bate_com_a_constante_documentada() {
+        let shortcut = validar(DEFAULT_LOOKUP_SHORTCUT).expect("padrao e valido");
         assert_eq!(shortcut.key, Code::KeyX);
         assert!(shortcut.mods.contains(Modifiers::ALT));
-        assert_eq!(DEFAULT_LOOKUP_SHORTCUT, "Alt+X");
     }
 
     #[test]
@@ -127,5 +148,22 @@ mod tests {
         let shortcut = escape_shortcut();
         assert_eq!(shortcut.key, Code::Escape);
         assert!(shortcut.mods.is_empty());
+    }
+
+    #[test]
+    fn validar_aceita_o_formato_que_a_ui_manda() {
+        let shortcut = validar("Alt+KeyZ").expect("combinacao valida");
+        assert_eq!(shortcut.key, Code::KeyZ);
+        assert!(shortcut.mods.contains(Modifiers::ALT));
+    }
+
+    #[test]
+    fn validar_recusa_combinacao_sem_tecla() {
+        assert!(validar("Alt+Ctrl").is_err());
+    }
+
+    #[test]
+    fn validar_recusa_lixo() {
+        assert!(validar("nao e um atalho").is_err());
     }
 }

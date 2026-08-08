@@ -261,6 +261,134 @@ export interface CardQuery {
   offset?: number;
 }
 
+/**
+ * Os dois atalhos configuraveis (F6). `Esc` (fechar o card) fica de fora: e o
+ * unico sem modificador, nunca colide com estes dois, e seu registro no core
+ * ja e dinamico por conta propria — so existe enquanto ha card aberto.
+ */
+export interface Shortcuts {
+  /** Segurar espia; soltar volta ao repouso. Padrão "Alt+X". */
+  lookup: string;
+  /** Abre o card da palavra sob o cursor. Padrão "Alt+C". */
+  card: string;
+}
+
+/** Estado do tradutor de frases, que não vem no instalador (332 MB). */
+export interface NmtStatus {
+  installed: boolean;
+  /** Quanto o download custa, em bytes. */
+  downloadBytes: number;
+  /** Onde os arquivos ficam na máquina. */
+  dir: string;
+}
+
+/** Progresso do download do tradutor (evento `setup://nmt`). */
+export interface NmtProgress {
+  arquivo: string;
+  baixado: number;
+  total: number;
+}
+
+/** Preferências de estudo e de primeira execução. */
+export interface Preferences {
+  /** Cards novos que a fila do dia introduz. Padrão 15, teto 200. */
+  newPerDay: number;
+  /** O wizard da primeira execução já foi concluído? */
+  onboardingDone: boolean;
+}
+
+/** Um item da fila de revisão: o card e a frase que vai na frente dele. */
+export interface ReviewCard {
+  card: DeckCard;
+  /** Contexto mais recente. `null` só em card que perdeu todos os contextos. */
+  context: CardContext | null;
+  contexts: number;
+}
+
+/** O pedido da fila, com o dia local já resolvido pela UI. */
+export interface QueueQuery {
+  /** Agora, em ISO-8601 UTC — é o que define "vencido". */
+  now: string;
+  /** Meia-noite local de hoje, em ISO-8601 UTC. */
+  dayStart: string;
+  newLimit: number;
+}
+
+export interface ReviewQueue {
+  /** Vencidos primeiro, novos depois. */
+  cards: ReviewCard[];
+  due: number;
+  fresh: number;
+  introducedToday: number;
+  /** Cards novos que não couberam na cota de hoje. */
+  newLeftOver: number;
+  /** Cards não suspensos no deck — distingue "deck vazio" de "tudo em dia". */
+  total: number;
+}
+
+/**
+ * Uma linha de `review_log`. Guarda o estado antes e depois para permitir
+ * re-otimizar os parâmetros do FSRS com o histórico real depois.
+ */
+export interface ReviewLogEntry {
+  reviewedAt: string;
+  /** 1=Errei, 2=Difícil, 3=Bom, 4=Fácil. */
+  rating: number;
+  elapsedDays: number;
+  stateBefore: FsrsState;
+  stateAfter: FsrsState;
+}
+
+/** O que a UI manda ao core depois da nota. O `fsrs` vem do wrapper do ts-fsrs. */
+export interface ReviewInput {
+  cardId: number;
+  fsrs: FsrsFields;
+  log: ReviewLogEntry;
+}
+
+/** Um dia do gráfico de Estatísticas. */
+export interface DailyPoint {
+  /** `YYYY-MM-DD` no fuso local. */
+  day: string;
+  created: number;
+  reviewed: number;
+}
+
+export interface GameCount {
+  game: string;
+  cards: number;
+}
+
+export interface StateCounts {
+  new: number;
+  learning: number;
+  review: number;
+  relearning: number;
+}
+
+export interface StatsQuery {
+  now: string;
+  /** Deslocamento do fuso local em minutos (Brasília = -180). */
+  tzOffsetMinutes: number;
+  /** Tamanho da janela do gráfico e da taxa de acerto, em dias. */
+  days: number;
+}
+
+export interface StatsSummary {
+  total: number;
+  suspended: number;
+  states: StateCounts;
+  dueNow: number;
+  reviewedToday: number;
+  /** Acertos/revisões na janela. `null` quando não houve revisão nenhuma. */
+  accuracy: number | null;
+  reviewsInWindow: number;
+  /** Dias seguidos com revisão, terminando hoje ou ontem. */
+  streak: number;
+  daily: DailyPoint[];
+  byGame: GameCount[];
+}
+
 /** Ocorrencia da palavra num jogo, anexada a um card. */
 export interface CardContext {
   id: number;

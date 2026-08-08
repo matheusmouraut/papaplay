@@ -240,9 +240,9 @@ interessa ao problema 1 da spike 01. Fica para quando o OCR estiver dentro do ap
 powershell -File scripts/fetch-ocr-models.ps1
 
 cd src-tauri
-cargo run --release --bin ocr-spike -- --repeticoes 5                    # tela inteira
-cargo run --release --bin ocr-spike -- --repeticoes 5 --regiao 1280x720  # janela do cursor
-cargo run --release --bin ocr-spike -- --imagem <png> --desenhar         # conferência visual
+cargo run --release --features spikes --bin ocr-spike -- --repeticoes 5                    # tela inteira
+cargo run --release --features spikes --bin ocr-spike -- --repeticoes 5 --regiao 1280x720  # janela do cursor
+cargo run --release --features spikes --bin ocr-spike -- --imagem <png> --desenhar         # conferência visual
 
 $env:PAPAPLAY_OCR_THREADS = "8"   # repete a varredura de threads
 ```

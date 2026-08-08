@@ -5,6 +5,10 @@ src-tauri/target
 src-tauri/gen
 src-tauri/icons
 
+# Saida do scripts/export-nmt.py: o tokenizer.json tem 3,7 MB numa linha so.
+# Reformatar um artefato gerado so cria diff que a proxima geracao desfaz.
+src-tauri/resources/nmt
+
 # Documentacao e config do Claude Code sao editadas a mao — o prettier
 # realinha tabelas markdown e cria diff sem valor.
 docs/

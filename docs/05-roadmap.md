@@ -20,10 +20,12 @@ Tudo do doc 02/03. Ordem sugerida de construção:
 5. ✅ Deck: salvar card com contexto + screenshot; telas de gestão. _(falta export CSV)_
 6. ✅ **Interação "espiar" (F1 reescrita)** — segurar `Alt+X` para espiar, soltar para sumir; clique abre o card; overlay nunca rouba o foco; sem caixas em volta das palavras. Substitui o modo lookup persistente. _(validado no app em 2026-08-01)_
 7. ✅ **Qualidade da leitura** — frase de contexto atravessando várias linhas; leitura acompanhando o cursor; modelos quentes (OCR pré-carregado, NMT com descarte por ociosidade em vez de a cada uso).
-8. **Linguagem visual (F7)** — sistema de design minimalista aplicado às duas janelas.
-9. **Atalhos configuráveis (F6)** — uma combinação por ação, editável e persistida; hoje `Alt+X`/`Alt+C` estão fixos no código. Tabela de ações e requisitos na F6 do doc 03.
-10. Revisão FSRS + estatísticas + streak.
-11. Onboarding + instalador + polish — inclui o **tray** que ficou faltando no item 1 (ícone com "Abrir"/"Sair", fechar a janela principal esconde em vez de matar) e o `bundle.resources` do `tauri.conf.json`, hoje vazio: o app só acha dict.db/modelos/nmt (390 MB) porque cai no caminho absoluto do repo compilado junto — em outra máquina não acharia nada.
+8. ✅ **Linguagem visual (F7)** — primitivos em `src/shared/components/ui.tsx` (botão, cartão, campo, título, estado vazio) aplicados às telas; a overlay mantém a superfície de vidro própria.
+9. ✅ **Atalhos configuráveis (F6)** — uma combinação por ação, capturada por gesto, validada e re-registrada sem reiniciar.
+10. ✅ Revisão FSRS + estatísticas + streak — fila do dia em `review.rs`, agregações em `stats.rs`, sessão com atalhos de teclado e resumo pós-sessão. Também: export CSV do deck.
+11. ✅ Onboarding + instalador — wizard de 4 passos, tray com "Abrir"/"Sair", **fechar a janela encerra o processo** (decisão de 2026-08-08: "quando eu fecho, fecha") e `bundle.resources` preenchido.
+
+**Distribuição (decidido em 2026-08-08):** instalador enxuto. Dicionário (42 MB) e OCR (11 MB) vão no NSIS; os dois `.onnx` do tradutor (332 MB) são baixados no primeiro uso para `%APPDATA%/papaplay/nmt/`, com hash conferido (`src-tauri/src/setup.rs`). O alternativo — 350 MB no instalador — reenviaria os mesmos 332 MB a cada atualização do app.
 
 **Por que 6–8 vêm antes da revisão:** o teste com o app rodando mostrou que o loop de captura funciona mas atrapalha o jogo — e uma ferramenta que quebra a imersão não é usada diariamente, que é justamente o critério de release abaixo. Corrigir a interação vale mais do que empilhar features em cima dela.
 

@@ -50,7 +50,7 @@ function Rastro() {
 function Aviso({ texto }: { texto: string }) {
   return (
     <div className="papa-surge absolute bottom-8 left-1/2 max-w-xl -translate-x-1/2">
-      <div className="papa-vidro rounded-lg border-red-500/30 px-4 py-2.5 text-xs leading-relaxed text-red-200/90">
+      <div className="papa-vidro rounded-lg border-papa-erro/30 px-4 py-2.5 text-xs leading-relaxed text-papa-erro">
         {texto}
       </div>
     </div>
