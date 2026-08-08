@@ -47,7 +47,19 @@ gh release create models-v1 `
   --notes "Baixado pelo app no primeiro uso. Tag separada da versao do app: so muda quando o modelo mudar."
 ```
 
-Depois disso, cada versão do app é um release normal com o instalador anexado.
+**Marque o release dos modelos como pre-release.** O `releases/latest` do GitHub
+é o release mais recente que não é pre-release, de qualquer tag — sem essa marca
+o `models-v1` vira o "latest" e o botão de download da landing manda o visitante
+para uma página com dois `.onnx` e nenhum instalador. O app não se importa: ele
+baixa pela URL da tag, não pela do `latest`.
+
+Depois disso, cada versão do app é um release normal com o instalador anexado:
+
+```powershell
+gh release create v0.1.0 `
+  src-tauri/target/release/bundle/nsis/PapaPlay_0.1.0_x64-setup.exe `
+  --title "PapaPlay 0.1.0" --notes-file NOTAS.md
+```
 
 ## Como usar
 

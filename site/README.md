@@ -44,5 +44,17 @@ do que nenhum.
 `main` que toque em `site/`. Antes do primeiro deploy, em **Settings › Pages**,
 marcar **Source: GitHub Actions**.
 
-O botão de download aponta para `releases/latest` — ele passa a funcionar
-quando o primeiro release do instalador for publicado.
+## O botão de download e a armadilha do `latest`
+
+O botão aponta para `releases/latest`, que o GitHub resolve como **o release
+mais recente que não é pre-release** — de qualquer tag, inclusive as que não
+são versões do app.
+
+Por isso o release dos modelos (`models-v1`, e qualquer `models-vN` futuro)
+**precisa estar marcado como pre-release**. Sem isso ele vira o "latest" e o
+botão manda o visitante para uma página com dois arquivos `.onnx` e nenhum
+instalador — foi exatamente o que aconteceu na primeira publicação.
+
+Marcar é em Releases › o release › _Edit_ › **Set as a pre-release**. Ele
+continua público e o app continua baixando dele normalmente: a URL que o
+`setup.rs` usa é a da tag, não a do `latest`.
