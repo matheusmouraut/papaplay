@@ -45,7 +45,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -53,6 +53,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": []
+    "resources": {
+      "resources/dict.db": "dict.db",
+      "resources/models/en_dict.txt": "models/en_dict.txt",
+      "resources/models/en_PP-OCRv3_det_infer.onnx": "models/en_PP-OCRv3_det_infer.onnx",
+      "resources/models/en_PP-OCRv3_rec_infer.onnx": "models/en_PP-OCRv3_rec_infer.onnx",
+      "resources/nmt/meta.json": "nmt/meta.json",
+      "resources/nmt/tokenizer.json": "nmt/tokenizer.json"
+    }
   }
 }

@@ -20,6 +20,25 @@ pub enum Error {
     #[error("ocr falhou: {0}")]
     Ocr(String),
 
+    /// Falha do dicionario: banco ausente, ilegivel ou consulta malformada.
+    #[error("dicionario falhou: {0}")]
+    Dict(String),
+
+    /// Falha da traducao de frases: modelo ausente, carga ou inferencia.
+    #[error("traducao falhou: {0}")]
+    Translate(String),
+
+    /// Falha do deck: banco do usuario inacessivel, migration ou consulta.
+    #[error("deck falhou: {0}")]
+    Deck(String),
+
+    /// Falha ao recortar ou gravar o screenshot de um contexto.
+    #[error("screenshot falhou: {0}")]
+    Media(String),
+
+    #[error(transparent)]
+    Sqlite(#[from] rusqlite::Error),
+
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
 

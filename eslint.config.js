@@ -6,7 +6,11 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "src-tauri/target", "node_modules"] },
+  // `scripts/.cache` guarda o venv dos scripts de build (dicionario, export do
+  // NMT): traz .js de dependencias Python que nao sao codigo deste repo.
+  {
+    ignores: ["dist", "src-tauri/target", "node_modules", "scripts/.cache"],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   reactHooks.configs.flat["recommended-latest"],
@@ -29,7 +33,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["vite.config.ts", "eslint.config.js"],
+    files: ["vite.config.ts", "eslint.config.js", "scripts/**/*.mjs"],
     languageOptions: { globals: globals.node },
   },
   prettier,

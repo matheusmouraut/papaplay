@@ -13,13 +13,21 @@ Provar os 2 riscos antes de construir o produto:
 
 Tudo do doc 02/03. Ordem sugerida de construção:
 
-1. Esqueleto Tauri: 2 janelas + tray + hotkeys + settings.
-2. Pipeline captura → OCR → destaques no overlay.
-3. Dicionário: script de build (wiktextract → SQLite) + lookup com lematização + tooltip/popup.
-4. Tradução de frases offline (Marian/Bergamot).
-5. Deck: salvar card com contexto + screenshot; telas de gestão.
-6. Revisão FSRS + estatísticas + streak.
-7. Onboarding + instalador + polish.
+1. ✅ Esqueleto Tauri: 2 janelas + hotkeys + settings. _(o **tray** nunca foi feito: sem ele, fechar a janela principal deixa o processo vivo por causa da overlay, e não há como sair nem reabrir a janela — ver item 11)_
+2. ✅ Pipeline captura → OCR → posicionamento no overlay.
+3. ✅ Dicionário: script de build (wiktextract → SQLite) + lookup com lematização + tooltip/popup.
+4. ✅ Tradução de frases offline (Marian/Bergamot).
+5. ✅ Deck: salvar card com contexto + screenshot; telas de gestão. _(falta export CSV)_
+6. ✅ **Interação "espiar" (F1 reescrita)** — segurar `Alt+X` para espiar, soltar para sumir; clique abre o card; overlay nunca rouba o foco; sem caixas em volta das palavras. Substitui o modo lookup persistente. _(validado no app em 2026-08-01)_
+7. ✅ **Qualidade da leitura** — frase de contexto atravessando várias linhas; leitura acompanhando o cursor; modelos quentes (OCR pré-carregado, NMT com descarte por ociosidade em vez de a cada uso).
+8. ✅ **Linguagem visual (F7)** — primitivos em `src/shared/components/ui.tsx` (botão, cartão, campo, título, estado vazio) aplicados às telas; a overlay mantém a superfície de vidro própria.
+9. ✅ **Atalhos configuráveis (F6)** — uma combinação por ação, capturada por gesto, validada e re-registrada sem reiniciar.
+10. ✅ Revisão FSRS + estatísticas + streak — fila do dia em `review.rs`, agregações em `stats.rs`, sessão com atalhos de teclado e resumo pós-sessão. Também: export CSV do deck.
+11. ✅ Onboarding + instalador — wizard de 4 passos, tray com "Abrir"/"Sair", **fechar a janela encerra o processo** (decisão de 2026-08-08: "quando eu fecho, fecha") e `bundle.resources` preenchido.
+
+**Distribuição (decidido em 2026-08-08):** instalador enxuto. Dicionário (42 MB) e OCR (11 MB) vão no NSIS; os dois `.onnx` do tradutor (332 MB) são baixados no primeiro uso para `%APPDATA%/papaplay/nmt/`, com hash conferido (`src-tauri/src/setup.rs`). O alternativo — 350 MB no instalador — reenviaria os mesmos 332 MB a cada atualização do app.
+
+**Por que 6–8 vêm antes da revisão:** o teste com o app rodando mostrou que o loop de captura funciona mas atrapalha o jogo — e uma ferramenta que quebra a imersão não é usada diariamente, que é justamente o critério de release abaixo. Corrigir a interação vale mais do que empilhar features em cima dela.
 
 **Release critério:** você usando diariamente por 2 semanas sem abandonar por fricção.
 
@@ -54,6 +62,18 @@ Tudo do doc 02/03. Ordem sugerida de construção:
 - Decks compartilhados por jogo ("vocabulário essencial de Hollow Knight").
 - macOS/Linux.
 - Monetização: núcleo grátis; premium = recursos de IA + sync + mobile. Sem anúncios.
+
+## Ideias que nasceram do primeiro teste com o app rodando
+
+Ordenadas por quanto protegem a imersão — o critério que o teste mostrou ser o que decide se o app é usado:
+
+- **Salvar sem abrir nada:** espiando, com a palavra sob o cursor, uma tecla (ex.: `S`) salva direto no deck e mostra só um toast de 1s. Salvar sem parar de jogar é o caminho mais curto entre "vi a palavra" e "vou revisar depois".
+- **Fila de revisita:** as palavras espiadas na sessão ficam numa lista na janela principal ("você olhou 12 palavras hoje, 3 viraram card") — decidir o que salvar depois, fora do jogo, sem gastar atenção durante.
+- **Cache da tela lida:** espiar duas vezes a mesma caixa de diálogo não deveria pagar OCR de novo. Cache por região + hash do recorte, invalidado quando o conteúdo muda.
+- **Marca discreta em palavra já salva:** enquanto espia, um ponto sutil sob palavras que já estão no deck — sem pintar a tela.
+- **Espiar com o teclado:** navegar entre as palavras da frase com as setas enquanto segura o atalho, para quem joga com as duas mãos no teclado.
+- **Perfis por jogo:** lembrar o atalho, a região e a opacidade por processo — o que funciona num RPG de texto não é o que funciona num FPS.
+- **Modo leitura sem jogo:** a mesma espiada por cima do navegador/PDF já funciona hoje sem código novo; documentar como recurso em vez de deixar como efeito colateral.
 
 ## Backlog / ideias registradas
 

@@ -25,22 +25,34 @@ pub struct ForegroundTarget {
     /// Handle da janela como inteiro — so serve para devolver o foco depois.
     #[serde(skip)]
     pub hwnd: isize,
+    /// Handle do monitor como inteiro — entrada da captura (WGC cria o item
+    /// de captura a partir dele). Valido no processo todo, entao pode
+    /// atravessar threads.
+    #[serde(skip)]
+    pub hmonitor: isize,
     /// Titulo da janela em foco (= nome do jogo, na pratica).
     pub window_title: Option<String>,
     pub monitor: MonitorRect,
+    /// Escala de DPI do monitor (1.0 = 96 dpi). A UI precisa dela para
+    /// converter as bboxes em pixels fisicos para os pixels logicos do CSS.
+    pub scale_factor: f64,
 }
 
 #[cfg(windows)]
 mod imp {
     use std::mem::size_of;
 
-    use windows::Win32::Foundation::{HWND, RECT};
+    use windows::Win32::Foundation::{HWND, POINT, RECT};
     use windows::Win32::Graphics::Gdi::{
-        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+        GetMonitorInfoW, MonitorFromWindow, HMONITOR, MONITORINFO, MONITOR_DEFAULTTONEAREST,
         MONITOR_DEFAULTTOPRIMARY,
     };
+    use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
     use windows::Win32::UI::WindowsAndMessaging::{
-        GetForegroundWindow, GetWindowTextLengthW, GetWindowTextW, SetForegroundWindow,
+        GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowLongPtrW,
+        GetWindowTextLengthW, GetWindowTextW, SetForegroundWindow, SetWindowDisplayAffinity,
+        SetWindowLongPtrW, GWL_EXSTYLE, SM_SWAPBUTTON, WDA_EXCLUDEFROMCAPTURE, WS_EX_NOACTIVATE,
     };
 
     use super::{ForegroundTarget, MonitorRect};
@@ -65,16 +77,20 @@ mod imp {
         Some(String::from_utf16_lossy(&buf[..written as usize]))
     }
 
-    fn monitor_rect(hwnd: HWND) -> Result<MonitorRect> {
+    fn monitor_of(hwnd: HWND) -> HMONITOR {
         // Sem janela em foco (ex.: desktop vazio) caimos no monitor primario.
         let flags = if hwnd.0.is_null() {
             MONITOR_DEFAULTTOPRIMARY
         } else {
             MONITOR_DEFAULTTONEAREST
         };
-        // SAFETY: ambas as chamadas sao read-only; `info` tem cbSize preenchido
-        // como a API exige e vive por toda a chamada.
-        let monitor = unsafe { MonitorFromWindow(hwnd, flags) };
+        // SAFETY: chamada read-only; tolera handle nulo por causa do flag acima.
+        unsafe { MonitorFromWindow(hwnd, flags) }
+    }
+
+    fn monitor_rect(monitor: HMONITOR) -> Result<MonitorRect> {
+        // SAFETY: chamada read-only; `info` tem cbSize preenchido como a API
+        // exige e vive por toda a chamada.
         let mut info = MONITORINFO {
             cbSize: size_of::<MONITORINFO>() as u32,
             ..Default::default()
@@ -97,15 +113,95 @@ mod imp {
         })
     }
 
-    /// Janela em primeiro plano *agora* e o monitor dela.
+    /// Escala de DPI do monitor. Cai em 1.0 se a API falhar: uma escala errada
+    /// desloca as bboxes, mas nao justifica derrubar a captura inteira.
+    fn monitor_scale(monitor: HMONITOR) -> f64 {
+        let mut dpi_x = 0u32;
+        let mut dpi_y = 0u32;
+        // SAFETY: leitura; os dois ponteiros de saida sao locais validos.
+        let ok = unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) };
+        if ok.is_err() || dpi_x == 0 {
+            return 1.0;
+        }
+        dpi_x as f64 / 96.0
+    }
+
+    /// Janela em primeiro plano *agora*, o monitor dela e a escala desse monitor.
     pub fn foreground_target() -> Result<ForegroundTarget> {
         // SAFETY: leitura de estado global do shell, sem argumentos.
         let hwnd = unsafe { GetForegroundWindow() };
+        let monitor = monitor_of(hwnd);
         Ok(ForegroundTarget {
             hwnd: hwnd.0 as isize,
+            hmonitor: monitor.0 as isize,
             window_title: window_title(hwnd),
-            monitor: monitor_rect(hwnd)?,
+            monitor: monitor_rect(monitor)?,
+            scale_factor: monitor_scale(monitor),
         })
+    }
+
+    /// Some da captura de tela — aplicado **na nossa propria janela**.
+    ///
+    /// Sem isto a overlay entra na foto: o WGC fotografa o monitor composto,
+    /// entao os destaques desenhados numa consulta virariam texto na consulta
+    /// seguinte. Efeito colateral aceito: a overlay tambem some de gravacoes e
+    /// de compartilhamento de tela.
+    pub fn exclude_from_capture(hwnd: isize) -> bool {
+        if hwnd == 0 {
+            return false;
+        }
+        // SAFETY: `hwnd` e uma janela deste processo; a API valida o handle e
+        // devolve FALSE em vez de causar UB.
+        unsafe { SetWindowDisplayAffinity(to_hwnd(hwnd), WDA_EXCLUDEFROMCAPTURE).is_ok() }
+    }
+
+    /// Posicao do cursor em coordenadas da area de trabalho virtual.
+    pub fn cursor_pos() -> Option<(i32, i32)> {
+        let mut point = POINT::default();
+        // SAFETY: leitura; `point` e um local valido pela duracao da chamada.
+        match unsafe { GetCursorPos(&mut point) } {
+            Ok(()) => Some((point.x, point.y)),
+            Err(_) => None,
+        }
+    }
+
+    /// Botao **principal** do mouse pressionado neste instante.
+    ///
+    /// Leitura de estado global, do mesmo tipo que `GetCursorPos`: nao instala
+    /// hook, nao intercepta nada e nao impede o clique de chegar ao jogo (ver
+    /// CLAUDE.md, regra 1). E o unico jeito de saber do clique enquanto a
+    /// overlay esta click-through — nesse estado o webview nao recebe mouse.
+    ///
+    /// Respeita a troca de botoes do Windows (canhotos): quem inverteu os
+    /// botoes clica com o direito, e e esse clique que conta.
+    pub fn primary_button_down() -> bool {
+        // SAFETY: leitura de estado global; `GetSystemMetrics` e infalivel.
+        let trocado = unsafe { GetSystemMetrics(SM_SWAPBUTTON) } != 0;
+        let virtual_key = if trocado { 0x02 } else { VK_LBUTTON.0 as i32 };
+        // O bit alto diz "pressionado agora"; o bit baixo, "foi pressionado
+        // desde a ultima consulta" — este ultimo nao serve, porque consumiria
+        // cliques que o usuario deu no jogo antes de espiar.
+        // SAFETY: leitura de estado global do teclado/mouse.
+        (unsafe { GetAsyncKeyState(virtual_key) } as u16 & 0x8000) != 0
+    }
+
+    /// Marca a janela como "nao ativavel" (`WS_EX_NOACTIVATE`).
+    ///
+    /// E o que deixa o card receber cliques **sem** tirar o jogo do primeiro
+    /// plano. Sem isso, abrir o card faria o alt-tab que a F1 proibe: em
+    /// borderless fullscreen o jogo pisca e, em alguns, minimiza.
+    pub fn set_no_activate(hwnd: isize) -> bool {
+        if hwnd == 0 {
+            return false;
+        }
+        let janela = to_hwnd(hwnd);
+        // SAFETY: `hwnd` e uma janela deste processo; ler e reescrever o estilo
+        // estendido dela e a operacao documentada para este efeito.
+        unsafe {
+            let atual = GetWindowLongPtrW(janela, GWL_EXSTYLE);
+            let novo = atual | WS_EX_NOACTIVATE.0 as isize;
+            SetWindowLongPtrW(janela, GWL_EXSTYLE, novo) != 0 || atual == novo
+        }
     }
 
     /// Devolve o foco para a janela que o tinha antes do modo lookup.
@@ -134,9 +230,28 @@ mod imp {
     pub fn restore_foreground(_hwnd: isize) -> bool {
         false
     }
+
+    pub fn cursor_pos() -> Option<(i32, i32)> {
+        None
+    }
+
+    pub fn exclude_from_capture(_hwnd: isize) -> bool {
+        false
+    }
+
+    pub fn primary_button_down() -> bool {
+        false
+    }
+
+    pub fn set_no_activate(_hwnd: isize) -> bool {
+        false
+    }
 }
 
-pub use imp::{foreground_target, restore_foreground};
+pub use imp::{
+    cursor_pos, exclude_from_capture, foreground_target, primary_button_down, restore_foreground,
+    set_no_activate,
+};
 
 #[cfg(test)]
 mod tests {

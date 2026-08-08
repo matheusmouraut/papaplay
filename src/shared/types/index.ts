@@ -31,6 +31,97 @@ export interface OcrResult {
   capturedAt: string;
 }
 
+/** Acepcao de uma palavra no dicionario offline. */
+export interface DictSense {
+  /** Classe gramatical crua do Wiktionary ("noun", "verb", "adj"...). */
+  pos: string;
+  /** Traducoes/definicao em portugues — e o que o tooltip mostra. */
+  glossPt: string;
+  /** Definicao em ingles, quando a fonte tinha uma. */
+  glossEn: string | null;
+  examples: string[];
+}
+
+/** Verbete devolvido por `dict_lookup`. */
+export interface DictEntry {
+  lemma: string;
+  ipa: string | null;
+  senses: DictSense[];
+  /** Posicao na lista de frequencia; menor = mais comum. */
+  freqRank: number | null;
+  /** A forma que estava na tela, quando difere do lema ("ran" para "run"). */
+  matchedForm: string | null;
+}
+
+/**
+ * Retangulo em pixels **logicos**, relativo ao canto da overlay.
+ *
+ * Ja vem convertido do core: a overlay posiciona direto, sem tocar em escala
+ * de DPI. A conversao mora em `lookup::para_overlay` no Rust.
+ */
+export interface OverlayRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Palavra reconhecida, ja posicionada para desenhar na overlay. */
+export interface LookupWord {
+  text: string;
+  rect: OverlayRect;
+  conf: number;
+  /** Indice da linha em `LookupResult.lines` — de onde sai a frase do card. */
+  lineIndex: number;
+}
+
+export interface LookupLine {
+  text: string;
+  rect: OverlayRect;
+}
+
+/** Resultado de uma consulta: captura + OCR de uma janela em volta do cursor. */
+export interface LookupResult {
+  /**
+   * Identificador desta consulta.
+   *
+   * Volta em `SaveCardInput` para o core saber de qual captura recortar o
+   * screenshot — e para recusar o recorte se outra consulta rodou no meio.
+   */
+  lookupId: number;
+  words: LookupWord[];
+  lines: LookupLine[];
+  /** Cursor em pixels logicos da overlay no instante da captura. */
+  cursor: [number, number] | null;
+  gameName: string | null;
+  /** Recorte lido, em pixels fisicos — diagnostico. */
+  region: { x: number; y: number; width: number; height: number };
+  captureMs: number;
+  ocrMs: number;
+  totalMs: number;
+}
+
+/**
+ * Estado da espiada (evento `peek://state`).
+ *
+ * `idle` = repouso; `peek` = tecla segurada, seguindo o cursor; `card` = o
+ * usuario clicou e o card esta aberto.
+ */
+export type PeekState = "idle" | "peek" | "card";
+
+/** A palavra sob o cursor (evento `peek://focus`). */
+export interface PeekFocus {
+  /** Leitura de onde a palavra saiu — vai junto ao salvar, para o screenshot. */
+  lookupId: number;
+  word: string;
+  /** Retangulo da palavra em pixels logicos da overlay. */
+  rect: OverlayRect;
+  lineIndex: number;
+  /** Frase onde a palavra esta — o contexto do card. */
+  sentence: string;
+  gameName: string | null;
+}
+
 /** Retangulo de um monitor em pixels fisicos da area de trabalho virtual. */
 export interface MonitorRect {
   x: number;
@@ -68,22 +159,25 @@ export interface OverlayBenchReport {
   samplesUs: number[];
 }
 
-/** Uma acepcao do dicionario. */
-export interface Sense {
-  pos: string;
-  glossPt: string;
-  glossEn?: string;
-  examples?: string[];
-}
-
-export interface DictEntry {
-  lemma: string;
-  ipa: string | null;
-  senses: Sense[];
-  freqRank: number | null;
-}
-
 export type FsrsState = "new" | "learning" | "review" | "relearning";
+
+/**
+ * Estado do FSRS no formato que o core persiste.
+ *
+ * So `src/shared/srs` produz um destes (regra inviolavel #4): o Rust grava o
+ * que recebe, sem calcular agendamento.
+ */
+export interface FsrsFields {
+  due: string;
+  stability: number;
+  difficulty: number;
+  state: FsrsState;
+  reps: number;
+  lapses: number;
+  scheduledDays: number;
+  learningSteps: number;
+  lastReview: string | null;
+}
 
 /** Card do deck. Os campos `fsrs*` so devem ser alterados via `src/shared/srs`. */
 export interface DeckCard {
@@ -97,6 +191,202 @@ export interface DeckCard {
   fsrsState: FsrsState;
   fsrsReps: number;
   fsrsLapses: number;
+  fsrsScheduledDays: number;
+  fsrsLearningSteps: number;
+  fsrsLastReview: string | null;
+}
+
+/** Payload de "salvar no deck" — o que o overlay manda ao core. */
+export interface SaveCardInput {
+  lemma: string;
+  /** A forma como estava na tela ("ran"), nao o lema. */
+  form: string;
+  sentenceEn: string;
+  sentencePt: string | null;
+  gameName: string | null;
+  /** So e usado quando o card ainda nao existe. */
+  fsrs: FsrsFields;
+  /** Consulta de onde a frase saiu — sem ela o card fica sem screenshot. */
+  lookupId?: number;
+  /** Indice da linha da frase dentro daquela consulta. */
+  lineIndex?: number;
+}
+
+/** Card visto de fora: o suficiente para o botao da overlay se orientar. */
+export interface CardSummary {
+  id: number;
+  lemma: string;
+  /** Quantas vezes a palavra ja foi encontrada e salva. */
+  contexts: number;
+  /** `true` se este salvamento criou o card; `false` se so anexou contexto. */
+  created: boolean;
+}
+
+/** Card como a lista da tela Deck o mostra. */
+export interface CardRow {
+  id: number;
+  lemma: string;
+  createdAt: string;
+  suspended: boolean;
+  fsrsDue: string;
+  fsrsState: FsrsState;
+  fsrsReps: number;
+  fsrsLapses: number;
+  /** Quantas vezes a palavra ja foi encontrada. */
+  contexts: number;
+  /** Frase do contexto mais recente — o que identifica o card na lista. */
+  lastSentence: string | null;
+  lastGame: string | null;
+}
+
+/** Um card com todos os contextos, para o painel de detalhe. */
+export interface CardDetail {
+  card: CardRow;
+  contexts: CardContext[];
+}
+
+/** Ordenacoes da lista do deck. */
+export type DeckOrder =
+  "recentes" | "alfabetica" | "vencimento" | "maisDificeis";
+
+/** Filtros da lista do deck. Tudo opcional. */
+export interface CardQuery {
+  search?: string | null;
+  game?: string | null;
+  state?: FsrsState | null;
+  /** Suspensos ("ja sei") ficam de fora por padrao. */
+  includeSuspended?: boolean;
+  order?: DeckOrder;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Os dois atalhos configuraveis (F6). `Esc` (fechar o card) fica de fora: e o
+ * unico sem modificador, nunca colide com estes dois, e seu registro no core
+ * ja e dinamico por conta propria — so existe enquanto ha card aberto.
+ */
+export interface Shortcuts {
+  /** Segurar espia; soltar volta ao repouso. Padrão "Alt+X". */
+  lookup: string;
+  /** Abre o card da palavra sob o cursor. Padrão "Alt+C". */
+  card: string;
+}
+
+/** Estado do tradutor de frases, que não vem no instalador (332 MB). */
+export interface NmtStatus {
+  installed: boolean;
+  /** Quanto o download custa, em bytes. */
+  downloadBytes: number;
+  /** Onde os arquivos ficam na máquina. */
+  dir: string;
+}
+
+/** Progresso do download do tradutor (evento `setup://nmt`). */
+export interface NmtProgress {
+  arquivo: string;
+  baixado: number;
+  total: number;
+}
+
+/** Preferências de estudo e de primeira execução. */
+export interface Preferences {
+  /** Cards novos que a fila do dia introduz. Padrão 15, teto 200. */
+  newPerDay: number;
+  /** O wizard da primeira execução já foi concluído? */
+  onboardingDone: boolean;
+}
+
+/** Um item da fila de revisão: o card e a frase que vai na frente dele. */
+export interface ReviewCard {
+  card: DeckCard;
+  /** Contexto mais recente. `null` só em card que perdeu todos os contextos. */
+  context: CardContext | null;
+  contexts: number;
+}
+
+/** O pedido da fila, com o dia local já resolvido pela UI. */
+export interface QueueQuery {
+  /** Agora, em ISO-8601 UTC — é o que define "vencido". */
+  now: string;
+  /** Meia-noite local de hoje, em ISO-8601 UTC. */
+  dayStart: string;
+  newLimit: number;
+}
+
+export interface ReviewQueue {
+  /** Vencidos primeiro, novos depois. */
+  cards: ReviewCard[];
+  due: number;
+  fresh: number;
+  introducedToday: number;
+  /** Cards novos que não couberam na cota de hoje. */
+  newLeftOver: number;
+  /** Cards não suspensos no deck — distingue "deck vazio" de "tudo em dia". */
+  total: number;
+}
+
+/**
+ * Uma linha de `review_log`. Guarda o estado antes e depois para permitir
+ * re-otimizar os parâmetros do FSRS com o histórico real depois.
+ */
+export interface ReviewLogEntry {
+  reviewedAt: string;
+  /** 1=Errei, 2=Difícil, 3=Bom, 4=Fácil. */
+  rating: number;
+  elapsedDays: number;
+  stateBefore: FsrsState;
+  stateAfter: FsrsState;
+}
+
+/** O que a UI manda ao core depois da nota. O `fsrs` vem do wrapper do ts-fsrs. */
+export interface ReviewInput {
+  cardId: number;
+  fsrs: FsrsFields;
+  log: ReviewLogEntry;
+}
+
+/** Um dia do gráfico de Estatísticas. */
+export interface DailyPoint {
+  /** `YYYY-MM-DD` no fuso local. */
+  day: string;
+  created: number;
+  reviewed: number;
+}
+
+export interface GameCount {
+  game: string;
+  cards: number;
+}
+
+export interface StateCounts {
+  new: number;
+  learning: number;
+  review: number;
+  relearning: number;
+}
+
+export interface StatsQuery {
+  now: string;
+  /** Deslocamento do fuso local em minutos (Brasília = -180). */
+  tzOffsetMinutes: number;
+  /** Tamanho da janela do gráfico e da taxa de acerto, em dias. */
+  days: number;
+}
+
+export interface StatsSummary {
+  total: number;
+  suspended: number;
+  states: StateCounts;
+  dueNow: number;
+  reviewedToday: number;
+  /** Acertos/revisões na janela. `null` quando não houve revisão nenhuma. */
+  accuracy: number | null;
+  reviewsInWindow: number;
+  /** Dias seguidos com revisão, terminando hoje ou ontem. */
+  streak: number;
+  daily: DailyPoint[];
+  byGame: GameCount[];
 }
 
 /** Ocorrencia da palavra num jogo, anexada a um card. */

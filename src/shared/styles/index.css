@@ -1,16 +1,32 @@
 @import "tailwindcss";
-
-@theme {
-  --color-papa-bg: #0f1117;
-  --color-papa-surface: #171a23;
-  --color-papa-border: #262b38;
-  --color-papa-accent: #6ee7b7;
-  --color-papa-text: #e6e8ef;
-  --color-papa-muted: #8b93a7;
-}
+@import "./theme.css";
 
 html,
 body,
 #root {
   height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-papa-bg);
+  color: var(--color-papa-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Foco visível por teclado, invisível por mouse: acessibilidade sem o anel
+   azul aparecendo a cada clique. */
+:focus-visible {
+  outline: 2px solid
+    color-mix(in srgb, var(--color-papa-accent) 60%, transparent);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Barras de rolagem discretas — o conteúdo é que deve ser visto. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-papa-border-strong) transparent;
 }

@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PapaPlay — aprenda inglês sem parar de jogar</title>
+    <meta
+      name="description"
+      content="Overlay para Windows que traduz palavras em inglês dentro do jogo. Segure Alt+X, aponte para a palavra, salve no deck e revise depois. Offline e sem custo."
+    />
+    <link rel="icon" href="img/logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="estilo.css" />
+
+    <meta property="og:title" content="PapaPlay" />
+    <meta
+      property="og:description"
+      content="Aprenda inglês sem parar de jogar. Overlay offline para Windows."
+    />
+    <meta property="og:type" content="website" />
+  </head>
+
+  <body>
+    <header class="topo" id="topo">
+      <div class="envolucro">
+        <a class="marca" href="#topo">
+          <img src="img/logo.svg" alt="" width="30" height="30" />
+          PapaPlay
+        </a>
+        <nav class="menu">
+          <a href="#como-funciona">Como funciona</a>
+          <a href="#recursos">Recursos</a>
+          <a href="#privacidade">Privacidade</a>
+          <a href="#faq">Dúvidas</a>
+        </nav>
+        <a
+          class="botao botao-principal"
+          href="https://github.com/matheusmouraut/papaplay/releases/latest"
+          >Baixar</a
+        >
+      </div>
+    </header>
+
+    <main>
+      <!-- ------------------------------------------------------- herói -->
+      <section class="heroi">
+        <div class="envolucro">
+          <span class="selo">Offline · grátis · Windows</span>
+
+          <h1>Aprenda inglês <em>sem parar de jogar</em></h1>
+
+          <p class="subtitulo">
+            Segure uma tecla, aponte para uma palavra na tela do jogo e veja a
+            tradução na hora. Salve no deck e revise depois — sem alt-tab, sem
+            copiar e colar, sem tirar o jogo do foco.
+          </p>
+
+          <div class="acoes">
+            <a
+              class="botao botao-principal botao-grande"
+              href="https://github.com/matheusmouraut/papaplay/releases/latest"
+            >
+              Baixar para Windows
+            </a>
+            <a
+              class="botao botao-secundario botao-grande"
+              href="https://github.com/matheusmouraut/papaplay"
+            >
+              Ver o código
+            </a>
+            <span class="nota-do-download">31 MB · Windows 10 e 11</span>
+          </div>
+
+          <!-- O mock usa o tooltip real do produto sobre uma captura real de
+               jogo: se o desenho mudar no app, ele muda aqui também. -->
+          <figure class="demo">
+            <div class="demo-tela">
+              <img
+                src="img/jogo.png"
+                alt="Trecho de uma tela de jogo em inglês com a tradução de uma palavra aparecendo sobre ela"
+                width="1370"
+                height="230"
+              />
+            </div>
+            <!-- Fora do `.demo-tela` de propósito: lá dentro o `overflow:
+                 hidden` que arredonda a imagem cortaria o tooltip. Aqui ele
+                 pode transbordar a moldura, que é o que ele faz no jogo. -->
+            <span class="sublinhado" aria-hidden="true"></span>
+            <div class="tooltip">
+              <strong>constellation</strong>
+              <span class="seta">→</span>constelação<span class="classe"
+                >subst.</span
+              >
+              <span class="dica">clique ou <kbd>Alt+C</kbd> para ver mais</span>
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------ como funciona -->
+      <section class="secao-clara" id="como-funciona">
+        <div class="envolucro">
+          <h2>Três segundos entre a dúvida e a resposta</h2>
+          <p class="secao-intro">
+            O gesto é o de quem passa o dedo numa palavra enquanto lê. Não
+            existe "modo ligado": em repouso o PapaPlay não desenha nada e não
+            consome praticamente nada.
+          </p>
+
+          <div class="grade grade-3">
+            <article class="cartao">
+              <span class="passo-numero">1</span>
+              <h3>Segure <kbd>Alt</kbd> + <kbd>X</kbd></h3>
+              <p>
+                A tecla é sua enquanto estiver pressionada. Solte e tudo some —
+                o jogo continua exatamente onde estava.
+              </p>
+            </article>
+            <article class="cartao">
+              <span class="passo-numero">2</span>
+              <h3>Aponte para a palavra</h3>
+              <p>
+                A tradução aparece numa linha discreta sobre a tela. Nada de
+                caixas em volta de tudo que o app conseguiu ler.
+              </p>
+            </article>
+            <article class="cartao">
+              <span class="passo-numero">3</span>
+              <h3>Clique para salvar</h3>
+              <p>
+                O card guarda a palavra, a frase inteira, a tradução dela e o
+                recorte da tela onde você encontrou.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------- recursos -->
+      <section id="recursos">
+        <div class="envolucro">
+          <h2>O que vem dentro</h2>
+          <p class="secao-intro">
+            Tudo roda na sua máquina. Depois da instalação, o PapaPlay funciona
+            com o cabo de rede desconectado.
+          </p>
+
+          <div class="grade grade-3">
+            <article class="cartao">
+              <span class="icone">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z" />
+                  <path d="M20 5h-7a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h7z" />
+                </svg>
+              </span>
+              <h3>Dicionário offline</h3>
+              <p>
+                Acepções, classe gramatical e IPA, construídos do Wiktionary.
+                Reconhece flexões: clicou em "ran", o card é de "run".
+              </p>
+            </article>
+
+            <article class="cartao">
+              <span class="icone icone-coral">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h10M9 4v3M6 15c3-1 5-4 5-8" />
+                  <path d="M12 20l4-9 4 9M13.7 17h5.6" />
+                </svg>
+              </span>
+              <h3>Tradução da frase</h3>
+              <p>
+                A frase inteira do diálogo, traduzida por um modelo que roda
+                localmente — sem mandar nada para servidor nenhum.
+              </p>
+            </article>
+
+            <article class="cartao">
+              <span class="icone icone-amarelo">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="14" rx="2" />
+                  <path d="M3 9h18M8 13h5" />
+                </svg>
+              </span>
+              <h3>Deck com contexto</h3>
+              <p>
+                Cada palavra guarda a cena em que apareceu. Você não revisa uma
+                lista de vocabulário: revisa a sua partida.
+              </p>
+            </article>
+
+            <article class="cartao">
+              <span class="icone">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-3-6.7" />
+                  <path d="M21 4v5h-5M12 8v4l3 2" />
+                </svg>
+              </span>
+              <h3>Revisão espaçada</h3>
+              <p>
+                FSRS, o mesmo algoritmo do Anki moderno: cada palavra volta
+                pouco antes de você esquecer, e não antes disso.
+              </p>
+            </article>
+
+            <article class="cartao">
+              <span class="icone icone-coral">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 19V9M10 19V5M16 19v-7M22 19H2" />
+                </svg>
+              </span>
+              <h3>Estatísticas</h3>
+              <p>
+                Dias seguidos, taxa de acerto e quanto vocabulário cada jogo te
+                rendeu. O suficiente para manter o hábito, e nada além.
+              </p>
+            </article>
+
+            <article class="cartao">
+              <span class="icone icone-amarelo">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3v12M8 11l4 4 4-4" />
+                  <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                </svg>
+              </span>
+              <h3>Seu deck é seu</h3>
+              <p>
+                Exportação em CSV a qualquer momento. Nada fica preso aqui
+                dentro, e o banco é um arquivo na sua pasta de usuário.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- -------------------------------------------------- privacidade -->
+      <section class="secao-clara" id="privacidade">
+        <div class="envolucro">
+          <h2>Não gravamos a sua tela</h2>
+          <p class="secao-intro">
+            Um app que lê a tela precisa ser explícito sobre o que faz com ela.
+            O que o PapaPlay faz:
+          </p>
+
+          <ul class="lista-limpa">
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <span>
+                <strong>Nenhuma captura sai da máquina.</strong> Os recortes
+                ficam no seu disco, dentro da pasta do app, e são apagados junto
+                com o card.
+              </span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <span>
+                <strong>Zero telemetria.</strong> Não há conta, não há login e
+                não existe servidor para onde mandar dado.
+              </span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <span>
+                <strong>Nada é injetado no jogo.</strong> O PapaPlay lê a imagem
+                da tela por uma API do próprio Windows, de fora. Ele não toca no
+                processo do jogo, o que é o que mantém o anti-cheat fora da
+                história.
+              </span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <span>
+                <strong>Uma única ida à internet.</strong> Na primeira execução,
+                para baixar o tradutor de frases — e você pode recusar.
+              </span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------- faq -->
+      <section id="faq">
+        <div class="envolucro">
+          <h2>Dúvidas</h2>
+
+          <div class="faq">
+            <details>
+              <summary>Funciona em qualquer jogo?</summary>
+              <p>
+                Funciona em qualquer coisa desenhada na tela: jogos em janela ou
+                borderless, navegador, leitor de PDF, visual novel. Em tela
+                cheia exclusiva o Windows não deixa nada ser desenhado por cima
+                — nesse caso, troque o jogo para borderless. Como a leitura é
+                por OCR, fontes muito estilizadas erram mais que fontes de
+                interface.
+              </p>
+            </details>
+
+            <details>
+              <summary>O jogo perde o foco quando eu espio?</summary>
+              <p>
+                Não. A overlay nunca chama o Windows para trazer a si mesma para
+                a frente — é uma decisão de projeto, porque um alt-tab forçado
+                no meio de uma luta é exatamente o tipo de coisa que faz
+                desinstalar o app. O jogo continua recebendo o teclado o tempo
+                todo.
+              </p>
+            </details>
+
+            <details>
+              <summary>Isso pode me dar ban por anti-cheat?</summary>
+              <p>
+                O PapaPlay não injeta código, não instala hook de teclado de
+                baixo nível e não lê a memória de nenhum processo. Ele captura a
+                imagem da tela por uma API pública do Windows, do lado de fora —
+                a mesma categoria de um programa de gravação de tela. Ainda
+                assim, nenhum app de terceiros pode prometer o comportamento de
+                um anti-cheat específico, então consulte as regras do seu jogo
+                se a competição for levada a sério.
+              </p>
+            </details>
+
+            <details>
+              <summary>Preciso de internet?</summary>
+              <p>
+                Só uma vez, e só se você quiser a tradução da frase inteira: o
+                modelo de tradução tem cerca de 330 MB e fica fora do instalador
+                para ele não pesar isso tudo. Dicionário, OCR, deck e revisão
+                funcionam offline desde a instalação.
+              </p>
+            </details>
+
+            <details>
+              <summary>Por que o instalador é tão pequeno?</summary>
+              <p>
+                Porque o que pesa — o tradutor de frases — é baixado à parte,
+                uma vez por máquina, e sobrevive às atualizações do app. Assim
+                uma correção de bug não custa 350 MB de download de novo.
+              </p>
+            </details>
+
+            <details>
+              <summary>Quanto custa?</summary>
+              <p>
+                Nada. Não há assinatura, anúncio nem limite de palavras. O
+                núcleo é offline e sem custo por uso, e é assim que ele foi
+                projetado desde o começo.
+              </p>
+            </details>
+
+            <details>
+              <summary>Quais idiomas?</summary>
+              <p>
+                Inglês para português do Brasil. É o par que o projeto faz bem
+                hoje; outros idiomas exigem outro dicionário e outro modelo de
+                tradução, e entram só quando puderem entrar com a mesma
+                qualidade.
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------ chamada -->
+      <section class="secao-clara chamada">
+        <div class="envolucro">
+          <h2>A próxima palavra que você não souber pode virar um card</h2>
+          <div class="acoes">
+            <a
+              class="botao botao-principal botao-grande"
+              href="https://github.com/matheusmouraut/papaplay/releases/latest"
+            >
+              Baixar para Windows
+            </a>
+            <span class="nota-do-download">31 MB · Windows 10 e 11</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="envolucro">
+        <div class="rodape-grade">
+          <div>
+            <a class="marca" href="#topo">
+              <img src="img/logo.svg" alt="" width="30" height="30" />
+              PapaPlay
+            </a>
+            <p class="rodape-nota" style="margin-top: 0.9rem">
+              Aprenda inglês sem parar de jogar.
+            </p>
+          </div>
+
+          <div>
+            <h4>Produto</h4>
+            <ul>
+              <li>
+                <a
+                  href="https://github.com/matheusmouraut/papaplay/releases/latest"
+                  >Baixar</a
+                >
+              </li>
+              <li><a href="#como-funciona">Como funciona</a></li>
+              <li><a href="#privacidade">Privacidade</a></li>
+              <li><a href="#faq">Dúvidas</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4>Projeto</h4>
+            <ul>
+              <li>
+                <a href="https://github.com/matheusmouraut/papaplay">Código</a>
+              </li>
+              <li>
+                <a href="https://github.com/matheusmouraut/papaplay/issues"
+                  >Reportar um problema</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/matheusmouraut/papaplay/tree/main/docs"
+                  >Documentação</a
+                >
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <p class="rodape-nota">
+          Dicionário derivado do Wiktionary (CC BY-SA). Tradução por OPUS-MT, da
+          Universidade de Helsinque (CC BY). As capturas de tela de jogos
+          pertencem aos seus respectivos donos.
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      // A borda do cabeçalho só aparece quando há conteúdo passando por baixo:
+      // no topo da página ela seria uma linha separando o nada.
+      const topo = document.getElementById("topo");
+      const marcar = () => topo.classList.toggle("rolado", window.scrollY > 8);
+      marcar();
+      addEventListener("scroll", marcar, { passive: true });
+    </script>
+  </body>
+</html>

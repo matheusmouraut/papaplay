@@ -46,6 +46,12 @@ export default defineConfig(async () => ({
 
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.{ts,tsx}", "tests/ui/**/*.test.{ts,tsx}"],
+    include: [
+      "src/**/*.test.{ts,tsx}",
+      "tests/ui/**/*.test.{ts,tsx}",
+      // Lógica de extração do dicionário: o pipeline inteiro é lento demais
+      // para virar teste, então as funções puras dele são cobertas aqui.
+      "scripts/**/*.test.mjs",
+    ],
   },
 }));

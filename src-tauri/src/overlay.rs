@@ -1,16 +1,18 @@
-//! Janela overlay: alterna entre modo passivo (click-through) e modo lookup
-//! (interativo), cobrindo o monitor da janela em foco.
+//! Janela overlay: a superficie transparente sobre o monitor do jogo.
 //!
-//! Spike 01 — ver `docs/spikes/spike-01-overlay.md`.
+//! Spike 01 — ver `docs/spikes/spike-01-overlay.md`. Quem decide *quando* ela
+//! aparece e o que ela mostra e [`crate::peek`]; aqui ficam so a geometria e a
+//! chave de "recebe clique / deixa passar".
 //!
 //! Invariantes:
 //! - A overlay fica **sempre visivel**; o que muda e so quem recebe o clique.
-//!   Isso mantem o custo de entrar em lookup baixo (sem show/hide da janela) e
-//!   permite desenhar destaques passivos no futuro.
-//! - Ao sair do modo lookup o foco volta para a janela que o tinha antes,
-//!   senao o jogo continua sem receber teclado.
+//!   Isso mantem o custo de comecar a espiar baixo (sem show/hide da janela).
+//! - **O foco nunca vem para ca.** A janela e `WS_EX_NOACTIVATE`: ela recebe
+//!   cliques sem tirar o jogo do primeiro plano. Alt-tab forcado era o que
+//!   piscava a tela em borderless fullscreen — ver F1 no doc 03.
 
-use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -22,11 +24,56 @@ use crate::platform;
 /// Label da janela overlay em `tauri.conf.json`.
 pub const OVERLAY_LABEL: &str = "overlay";
 
-/// `true` = modo lookup (recebe cliques); `false` = passivo (click-through).
+/// `true` = a overlay recebe cliques (card aberto); `false` = click-through.
 static INTERACTIVE: AtomicBool = AtomicBool::new(false);
 
-/// Janela que tinha o foco quando entramos em lookup (0 = nenhuma).
-static PREVIOUS_FOREGROUND: AtomicIsize = AtomicIsize::new(0);
+/// Alvo congelado no inicio da espiada.
+///
+/// A captura precisa saber de qual monitor ler e de que jogo veio o texto. Ler
+/// isso a cada leitura seria fragil: basta o usuario passar o mouse sobre a
+/// barra de tarefas para a "janela em foco" mudar no meio da espiada.
+static LOOKUP_TARGET: Mutex<Option<platform::ForegroundTarget>> = Mutex::new(None);
+
+/// Jogo e monitor de onde a leitura atual deve sair. `None` fora da espiada.
+pub fn lookup_target() -> Option<platform::ForegroundTarget> {
+    LOOKUP_TARGET.lock().ok().and_then(|alvo| alvo.clone())
+}
+
+/// Congela (ou libera, com `None`) o alvo da espiada.
+pub fn set_lookup_target(alvo: Option<platform::ForegroundTarget>) {
+    if let Ok(mut guarda) = LOOKUP_TARGET.lock() {
+        *guarda = alvo;
+    }
+}
+
+/// Deixa a overlay pronta para espiar: sobre o monitor certo, visivel e no
+/// topo, **interceptando o mouse**.
+///
+/// # Por que ela intercepta desde o inicio da espiada
+///
+/// Espiando com a overlay click-through, o clique que abre o card tambem
+/// chegava ao jogo — clicar numa palavra atirava. Interceptar desde o comeco
+/// resolve isso em tudo que le mouse por mensagem do Windows (navegador, PDF,
+/// visual novels, jogos 2D e de menu).
+///
+/// **Nao resolve em jogos que leem raw input / DirectInput**: esses recebem o
+/// clique pelo *foco*, e a overlay de proposito nunca tira o foco do jogo (F1).
+/// Para eles existe a tecla de abrir o card, que o `RegisterHotKey` consome
+/// antes de o jogo ver — ver [`crate::hotkeys`].
+///
+/// Idempotente e barata quando nada mudou — e chamada a cada espiada, e o
+/// orcamento dela e o "primeiro tooltip em <400ms" da F1.
+pub fn arm(app: &AppHandle, monitor: platform::MonitorRect) -> Result<()> {
+    let window = app
+        .get_webview_window(OVERLAY_LABEL)
+        .ok_or(Error::WindowNotFound(OVERLAY_LABEL))?;
+    cover_monitor(&window, monitor)?;
+    window.set_ignore_cursor_events(false)?;
+    window.set_always_on_top(true)?;
+    window.show()?;
+    INTERACTIVE.store(true, Ordering::SeqCst);
+    Ok(())
+}
 
 /// Resultado de uma troca de modo — vai para a UI pelo evento `overlay://mode`.
 #[derive(Debug, Clone, Serialize)]
@@ -88,32 +135,27 @@ pub fn set_mode(app: &AppHandle, interactive: bool) -> Result<ModeChange> {
         .ok_or(Error::WindowNotFound(OVERLAY_LABEL))?;
 
     let started = Instant::now();
-    let mut window_title = None;
-    let mut monitor = None;
+    let alvo = lookup_target();
+    let window_title = alvo.as_ref().and_then(|a| a.window_title.clone());
+    let monitor = alvo.as_ref().map(|a| a.monitor);
 
     if interactive {
-        // Le o alvo ANTES de roubar o foco — depois disso a janela em primeiro
-        // plano passa a ser a propria overlay.
-        let target = platform::foreground_target()?;
-        if target.hwnd != own_hwnd(&window) {
-            PREVIOUS_FOREGROUND.store(target.hwnd, Ordering::SeqCst);
+        // Sem `set_focus`: o clique chega ao card por causa do
+        // `WS_EX_NOACTIVATE` aplicado no `init`, e o jogo continua em primeiro
+        // plano. Ver o cabecalho do modulo.
+        if let Some(monitor) = monitor {
+            cover_monitor(&window, monitor)?;
         }
-        cover_monitor(&window, target.monitor)?;
         window.set_ignore_cursor_events(false)?;
         window.set_always_on_top(true)?;
         window.show()?;
-        window.set_focus()?;
-        window_title = target.window_title;
-        monitor = Some(target.monitor);
     } else {
-        window.set_ignore_cursor_events(true)?;
         // A overlay continua visivel — so para de interceptar o mouse.
-        let previous = PREVIOUS_FOREGROUND.swap(0, Ordering::SeqCst);
-        platform::restore_foreground(previous);
+        window.set_ignore_cursor_events(true)?;
     }
 
     // Parte da transicao, entao entra na medicao: o Esc global so pode existir
-    // enquanto estamos em lookup.
+    // enquanto ha um card aberto para ele fechar.
     crate::hotkeys::sync_escape(app, interactive)?;
     INTERACTIVE.store(interactive, Ordering::SeqCst);
 
@@ -128,11 +170,6 @@ pub fn set_mode(app: &AppHandle, interactive: bool) -> Result<ModeChange> {
     Ok(change)
 }
 
-/// Inverte o modo atual. E o que a hotkey `Alt+X` chama.
-pub fn toggle(app: &AppHandle) -> Result<ModeChange> {
-    set_mode(app, !is_interactive())
-}
-
 /// Deixa a overlay pronta no boot: cobrindo o monitor em foco, visivel e
 /// passiva. O modo passivo e o estado de repouso do app.
 pub fn init(app: &AppHandle) -> Result<()> {
@@ -143,6 +180,13 @@ pub fn init(app: &AppHandle) -> Result<()> {
     if let Ok(target) = platform::foreground_target() {
         cover_monitor(&window, target.monitor)?;
     }
+    // Tira a overlay da propria captura. Sem isto o tooltip de uma espiada
+    // apareceria como texto na leitura seguinte — o WGC fotografa o monitor ja
+    // composto, com as nossas janelas dentro.
+    platform::exclude_from_capture(own_hwnd(&window));
+    // Uma vez so, no boot: e o que permite ao card receber clique sem tirar o
+    // jogo do primeiro plano.
+    platform::set_no_activate(own_hwnd(&window));
     window.set_ignore_cursor_events(true)?;
     window.set_always_on_top(true)?;
     window.show()?;
@@ -167,8 +211,12 @@ pub struct GeometryCheck {
     pub matches: bool,
 }
 
-/// Entra em modo lookup, mede a geometria resultante e volta para passivo.
+/// Cobre o monitor em foco, mede a geometria resultante e volta ao repouso.
 pub fn check_geometry(app: &AppHandle) -> Result<GeometryCheck> {
+    // Arma direto pelo monitor em foco: fora de uma espiada nao ha alvo
+    // congelado, e esta verificacao roda justamente fora de uma.
+    let alvo = platform::foreground_target()?;
+    arm(app, alvo.monitor)?;
     let change = set_mode(app, true)?;
     let window = app
         .get_webview_window(OVERLAY_LABEL)
@@ -182,9 +230,7 @@ pub fn check_geometry(app: &AppHandle) -> Result<GeometryCheck> {
         width: size.width as i32,
         height: size.height as i32,
     };
-    let monitor = change
-        .monitor
-        .ok_or_else(|| Error::Platform("monitor alvo nao reportado".into()))?;
+    let monitor = change.monitor.unwrap_or(alvo.monitor);
 
     let matches = (actual.x - monitor.x).abs() <= 1
         && (actual.y - monitor.y).abs() <= 1
@@ -289,11 +335,6 @@ fn run_bench(app: &AppHandle, iterations: usize) -> BenchReport {
 #[tauri::command]
 pub async fn overlay_set_mode(app: AppHandle, interactive: bool) -> Result<ModeChange> {
     set_mode(&app, interactive)
-}
-
-#[tauri::command]
-pub async fn overlay_toggle(app: AppHandle) -> Result<ModeChange> {
-    toggle(&app)
 }
 
 #[tauri::command]

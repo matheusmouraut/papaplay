@@ -1,0 +1,87 @@
+/* Paleta compartilhada pelas duas janelas.
+ *
+ * Fica num arquivo próprio porque o Tailwind resolve `@theme` por folha de
+ * estilo: uma cor definida só no `index.css` simplesmente não existe na
+ * overlay, e classes como `text-papa-text` viram nada — texto invisível, sem
+ * erro nenhum no build. Foi o que aconteceu até aqui.
+ *
+ * Qualquer cor nova do produto entra aqui, não nas folhas das janelas.
+ *
+ * # Duas janelas, um jogo de nomes
+ *
+ * Os valores abaixo são os da **janela principal**, que é clara. A overlay
+ * redefine os mesmos nomes com valores escuros no `overlay.css` — o Tailwind v4
+ * emite `color: var(--color-papa-text)`, então sobrescrever a variável troca o
+ * tema inteiro sem tocar em uma classe sequer.
+ *
+ * A overlay não podia herdar o claro: ela flutua sobre a cena do jogo, e um
+ * cartão creme sobre um jogo escuro cega quem está jogando. Escuro translúcido
+ * sobre o jogo, claro na janela onde se lê e se revisa.
+ *
+ * # Contraste
+ *
+ * `text`, `muted` e `faint` passam de 4,5:1 sobre `bg` — inclusive o `faint`,
+ * que carrega as linhas de 11px (data, jogo, nome do arquivo). Em fundo claro a
+ * faixa utilizável é mais estreita que no escuro: os três tons ficam mais
+ * próximos entre si do que ficavam, e a hierarquia se apoia mais no tamanho e
+ * no peso do que na cor. */
+@theme {
+  /* Superfícies: três degraus, não mais. Fundo, cartão, cartão elevado.
+     O fundo é creme e não branco — branco puro atrás de cartões brancos
+     apagaria a diferença entre os dois. */
+  --color-papa-bg: #fbf8f3;
+  --color-papa-surface: #ffffff;
+  --color-papa-raised: #f4efe6;
+  --color-papa-border: #eae3d8;
+  /* Borda de elemento em foco/hover, um degrau acima da normal. */
+  --color-papa-border-strong: #d8cebf;
+
+  /* Texto em três pesos de atenção: o que se lê, o que se consulta, o que
+     só se percebe. Todos passam de 4,5:1 sobre `--color-papa-bg`. */
+  --color-papa-text: #2b2723;
+  --color-papa-muted: #5f574f;
+  --color-papa-faint: #79706a;
+
+  /* Um acento só, e ele significa "salvo/ativo" — nunca decoração.
+     Verde-papagaio. Este tom é um degrau mais escuro que o verde da marca
+     (#2f8f6f): sobre creme, o da marca dá 3,8:1 e não serve para texto. */
+  --color-papa-accent: #257e5f;
+  /* O mesmo verde em lavagem, para preenchimento e nunca para texto. */
+  --color-papa-accent-soft: #cfeadc;
+
+  /* Erro. Um vermelho quente o bastante para conviver com o creme, e escuro
+     o bastante para 11px. */
+  --color-papa-erro: #b4453a;
+  --color-papa-erro-soft: #fbeae7;
+
+  /* Cores de marca: só no logo, no cabeçalho e na landing. Nunca em dado —
+     colorir informação com elas quebraria a regra do acento único (F7). */
+  --color-papa-coral: #f2a98c;
+  --color-papa-amarelo: #f4c871;
+
+  /* Tipografia: uma família de interface neutra e uma monoespaçada para
+     fonética. Serifada no texto de leitura do card, que é onde o produto
+     quer parecer um editor, não um HUD. */
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, "Segoe UI Variable Text", "Segoe UI",
+    sans-serif;
+  --font-reading:
+    "Georgia", "Iowan Old Style", "Source Serif Pro", ui-serif, serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+
+  /* Movimento discreto: rápido o bastante para não ser notado durante o jogo
+     (F7), lento o bastante para não piscar. */
+  --ease-papa: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Um único ritmo de animação para tudo que aparece sobre o jogo. */
+@keyframes papa-surgir {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

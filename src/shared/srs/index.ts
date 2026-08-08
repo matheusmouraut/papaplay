@@ -16,7 +16,13 @@ import {
   type RecordLogItem,
 } from "ts-fsrs";
 
-import type { DeckCard, FsrsState } from "../types";
+import type {
+  DeckCard,
+  FsrsFields,
+  FsrsState,
+  ReviewInput,
+  ReviewLogEntry,
+} from "../types";
 
 export { Rating, State };
 export type { FsrsCard, Grade, RecordLogItem };
@@ -63,6 +69,31 @@ export function newCard(now: Date = new Date()): FsrsCard {
   return createEmptyCard(now);
 }
 
+/**
+ * Estado inicial de uma palavra salva no overlay, pronto para o `deck_save_card`.
+ *
+ * Existe para que o core nunca precise inventar um estado zerado por conta
+ * propria: "card novo" e uma definicao do FSRS, e ela mora aqui.
+ */
+export function newCardFields(now: Date = new Date()): FsrsFields {
+  return toFsrsFields(createEmptyCard(now));
+}
+
+/** Converte um card do ts-fsrs para o formato que o core persiste. */
+export function toFsrsFields(card: FsrsCard): FsrsFields {
+  return {
+    due: card.due.toISOString(),
+    stability: card.stability,
+    difficulty: card.difficulty,
+    state: STATE_TO_STRING[card.state],
+    reps: card.reps,
+    lapses: card.lapses,
+    scheduledDays: card.scheduled_days,
+    learningSteps: card.learning_steps,
+    lastReview: card.last_review ? card.last_review.toISOString() : null,
+  };
+}
+
 /** Previa dos 4 intervalos possiveis, para mostrar nos botoes de revisao. */
 export function preview(card: FsrsCard, now: Date = new Date()) {
   return scheduler.repeat(card, now);
@@ -85,9 +116,10 @@ export function retrievability(card: FsrsCard, now: Date = new Date()): number {
 /**
  * Converte o card persistido no SQLite para o formato do ts-fsrs.
  *
- * TODO(schema): `scheduled_days`, `learning_steps` e `last_review` ainda nao
- * existem em `cards` (ver docs/04). Sao reconstruidos com valores neutros ate
- * a migration que os adiciona — o agendamento de curto prazo fica aproximado.
+ * `elapsed_days` nao e persistido de proposito: e a distancia entre a ultima
+ * revisao e agora, ou seja, muda sozinho com o tempo. O proprio ts-fsrs o
+ * recalcula a cada `repeat`/`next`, entao guardar seria guardar uma copia que
+ * envelhece.
  */
 export function toFsrsCard(card: DeckCard): FsrsCard {
   return {
@@ -95,23 +127,105 @@ export function toFsrsCard(card: DeckCard): FsrsCard {
     stability: card.fsrsStability,
     difficulty: card.fsrsDifficulty,
     elapsed_days: 0,
-    scheduled_days: 0,
-    learning_steps: 0,
+    scheduled_days: card.fsrsScheduledDays,
+    learning_steps: card.fsrsLearningSteps,
     reps: card.fsrsReps,
     lapses: card.fsrsLapses,
     state: STRING_TO_STATE[card.fsrsState],
+    last_review: card.fsrsLastReview
+      ? new Date(card.fsrsLastReview)
+      : undefined,
   };
+}
+
+/**
+ * Uma nota do usuario, pronta para o `review_apply` do core.
+ *
+ * Concentra num lugar só as três coisas que precisam concordar entre si: o novo
+ * estado do card, a linha do histórico e o `elapsed_days` que o FSRS usou no
+ * cálculo. Montar isso na tela abriria a chance de gravar um log que não
+ * corresponde ao agendamento que foi salvo.
+ */
+export function gradeCard(
+  card: DeckCard,
+  grade: Grade,
+  now: Date = new Date(),
+): ReviewInput {
+  const atual = toFsrsCard(card);
+  const { card: proximo, log } = review(atual, grade, now);
+  const entrada: ReviewLogEntry = {
+    reviewedAt: now.toISOString(),
+    rating: grade,
+    elapsedDays: log.elapsed_days,
+    stateBefore: card.fsrsState,
+    stateAfter: STATE_TO_STRING[proximo.state],
+  };
+  return { cardId: card.id, fsrs: toFsrsFields(proximo), log: entrada };
+}
+
+/**
+ * O que cada botao promete: quando o card volta se o usuario der aquela nota.
+ *
+ * Ver o intervalo antes de responder é o que ensina o usuário a usar "Difícil"
+ * e "Fácil" em vez de só "Bom" — sem isso as quatro notas viram duas.
+ */
+export function intervalLabels(
+  card: DeckCard,
+  now: Date = new Date(),
+): Record<Grade, string> {
+  const previa = preview(toFsrsCard(card), now);
+  const rotulos = {} as Record<Grade, string>;
+  for (const grade of RATINGS) {
+    rotulos[grade] = distanciaAte(previa[grade].card.due, now);
+  }
+  return rotulos;
+}
+
+/**
+ * "10 min", "2 d", "3 mes" — a distancia ate a proxima aparicao do card.
+ *
+ * Arredonda para a maior unidade que ainda descreve o intervalo: nos passos de
+ * aprendizado o que importa são os minutos, e em revisão madura ninguém lê
+ * "43800 min".
+ */
+function distanciaAte(due: Date, agora: Date): string {
+  const minutos = Math.max(
+    1,
+    Math.round((due.getTime() - agora.getTime()) / 60000),
+  );
+  if (minutos < 60) return `${minutos} min`;
+  const horas = Math.round(minutos / 60);
+  if (horas < 24) return `${horas} h`;
+  const dias = Math.round(minutos / 1440);
+  if (dias < 31) return `${dias} d`;
+  const meses = Math.round(dias / 30);
+  if (meses < 12) return `${meses} mes`;
+  return `${(dias / 365).toFixed(1).replace(".", ",")} anos`;
 }
 
 /** Aplica um card do ts-fsrs de volta sobre o registro persistido. */
 export function fromFsrsCard(card: DeckCard, next: FsrsCard): DeckCard {
+  return withFsrsFields(card, toFsrsFields(next));
+}
+
+/**
+ * Carimba no card os campos que acabaram de ser gravados.
+ *
+ * A sessao de revisao usa isso para reenfileirar um card errado sem recarregar
+ * a fila: o card volta ao fim da lista ja com o estado novo, e a segunda
+ * tentativa e calculada em cima do agendamento correto.
+ */
+export function withFsrsFields(card: DeckCard, campos: FsrsFields): DeckCard {
   return {
     ...card,
-    fsrsDue: next.due.toISOString(),
-    fsrsStability: next.stability,
-    fsrsDifficulty: next.difficulty,
-    fsrsState: STATE_TO_STRING[next.state],
-    fsrsReps: next.reps,
-    fsrsLapses: next.lapses,
+    fsrsDue: campos.due,
+    fsrsStability: campos.stability,
+    fsrsDifficulty: campos.difficulty,
+    fsrsState: campos.state,
+    fsrsReps: campos.reps,
+    fsrsLapses: campos.lapses,
+    fsrsScheduledDays: campos.scheduledDays,
+    fsrsLearningSteps: campos.learningSteps,
+    fsrsLastReview: campos.lastReview,
   };
 }
