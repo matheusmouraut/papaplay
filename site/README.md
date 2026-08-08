@@ -2,12 +2,20 @@
 
 A landing do PapaPlay. HTML e CSS escritos à mão, sem build e sem dependência.
 
+No ar em **https://matheusmouraut.github.io/papaplay/**.
+
 ```
 site/
   index.html    a página inteira
   estilo.css    os estilos, com os tokens do produto no topo
-  img/          logo.svg e a captura de jogo do herói
+  img/          logo.svg, a captura de jogo do herói e og.png
 ```
+
+O `og.png` é o cartão que aparece quando o link é compartilhado. Ele é
+gerado, não desenhado à mão: um HTML de 1200×630 renderizado pelo Edge em modo
+headless, com o mesmo logo e a mesma manchete da página. Refazer é
+reescrever esse HTML e tirar um print dele — não há script para isso porque
+até hoje foi preciso uma vez só.
 
 Para ver: abra o `index.html` no navegador. Não há servidor de desenvolvimento
 porque não há nada para compilar.
