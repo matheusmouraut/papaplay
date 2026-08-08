@@ -1,0 +1,676 @@
+/* Landing do PapaPlay.
+ *
+ * CSS escrito à mão, sem Tailwind e sem build: a página é um arquivo só, e
+ * qualquer toolchain aqui seria mais peça para manter do que código economizado.
+ * O GitHub Pages serve esta pasta como está.
+ *
+ * Os tokens são os mesmos de `src/shared/styles/theme.css`. Repetidos, e não
+ * importados, porque o app compila com Tailwind e o site não — a duplicação é o
+ * preço de o site não depender do build do app. Mudou lá, muda aqui. */
+
+:root {
+  --bg: #fbf8f3;
+  --surface: #ffffff;
+  --raised: #f4efe6;
+  --border: #eae3d8;
+  --border-strong: #d8cebf;
+
+  --text: #2b2723;
+  --muted: #5f574f;
+  --faint: #79706a;
+
+  --accent: #257e5f;
+  --accent-soft: #cfeadc;
+  --coral: #f2a98c;
+  --amarelo: #f4c871;
+
+  /* A superfície da overlay, para o mock do herói mostrar o produto real. */
+  --vidro: #14161a;
+  --vidro-texto: #f2efe9;
+  --vidro-muted: #a9a29b;
+  --vidro-accent: #8fd3b0;
+
+  --sans:
+    "Inter", ui-sans-serif, system-ui, "Segoe UI Variable Text", "Segoe UI",
+    sans-serif;
+  --reading: "Georgia", "Iowan Old Style", ui-serif, serif;
+  --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --largura: 68rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+kbd {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 0.1em 0.45em;
+  background: var(--surface);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.envolucro {
+  width: 100%;
+  max-width: var(--largura);
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+/* ---------------------------------------------------------------- topo --- */
+
+.topo {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid transparent;
+  transition: border-color 200ms var(--ease);
+}
+.topo.rolado {
+  border-bottom-color: var(--border);
+}
+.topo .envolucro {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  height: 4.25rem;
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--reading);
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.marca:hover {
+  text-decoration: none;
+}
+.marca img {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.menu {
+  display: flex;
+  gap: 1.75rem;
+  margin-left: auto;
+  font-size: 0.9rem;
+}
+.menu a {
+  color: var(--muted);
+}
+.menu a:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* --------------------------------------------------------------- botões --- */
+
+.botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 10px;
+  padding: 0.7rem 1.15rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition:
+    background-color 150ms var(--ease),
+    border-color 150ms var(--ease),
+    transform 150ms var(--ease);
+}
+.botao:hover {
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+.botao-principal {
+  background: var(--accent);
+  color: #ffffff;
+}
+.botao-principal:hover {
+  background: #1f6d52;
+}
+.botao-secundario {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+.botao-secundario:hover {
+  border-color: var(--border-strong);
+  background: var(--raised);
+}
+.botao-grande {
+  padding: 0.9rem 1.5rem;
+  font-size: 1rem;
+}
+
+/* ---------------------------------------------------------------- herói --- */
+
+.heroi {
+  padding-block: 5rem 4rem;
+  position: relative;
+  overflow: hidden;
+}
+/* Duas manchas pastel muito difusas: dão o ar de aquarela sem virar gradiente
+   de fundo, que envelhece mal. */
+.heroi::before,
+.heroi::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.heroi::before {
+  width: 30rem;
+  height: 30rem;
+  background: var(--accent-soft);
+  top: -12rem;
+  right: -8rem;
+}
+.heroi::after {
+  width: 22rem;
+  height: 22rem;
+  background: var(--coral);
+  opacity: 0.22;
+  bottom: -10rem;
+  left: -6rem;
+}
+.heroi .envolucro {
+  position: relative;
+}
+
+.selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+h1 {
+  font-family: var(--reading);
+  font-weight: 400;
+  font-size: clamp(2.4rem, 5.5vw, 3.9rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 1.5rem 0 0;
+  max-width: 20ch;
+}
+h1 em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.subtitulo {
+  margin: 1.25rem 0 0;
+  font-size: 1.15rem;
+  color: var(--muted);
+  max-width: 46ch;
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2.25rem;
+}
+.nota-do-download {
+  font-size: 0.85rem;
+  color: var(--faint);
+}
+
+/* --------------------------------------------------- demonstração visual --- */
+
+.demo {
+  /* `figure` vem com 40px de margem lateral do navegador, o que desalinhava a
+     moldura do texto do herói. */
+  margin: 4rem 0 0;
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0.75rem;
+  box-shadow: 0 24px 60px -30px rgb(43 39 35 / 0.35);
+}
+.demo-tela {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #efeae4;
+}
+.demo-tela img {
+  width: 100%;
+}
+
+/* O tooltip real do produto, sobre a tela do jogo. É o desenho que está no
+   `src/overlay/components/Tooltip.tsx`, não uma ilustração dele. */
+.tooltip {
+  position: absolute;
+  /* Ancorado logo abaixo de "constellation" na segunda linha da captura. As
+     porcentagens são medidas contra `.demo`, e por isso ele acompanha a
+     imagem quando ela é redimensionada. */
+  left: 13.5%;
+  top: 82%;
+  background: color-mix(in srgb, var(--vidro) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid #343a44;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  color: var(--vidro-texto);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  box-shadow: 0 12px 32px -8px rgb(0 0 0 / 0.55);
+  white-space: nowrap;
+}
+.tooltip .seta {
+  color: #6a7280;
+  margin-inline: 0.4rem;
+}
+.tooltip .classe {
+  color: var(--vidro-muted);
+  font-size: 0.8rem;
+  margin-left: 0.4rem;
+}
+.tooltip .dica {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: #7e7770;
+}
+/* O `kbd` da página é claro; sobre o vidro escuro ele viraria uma etiqueta
+   branca gritando no meio do tooltip. */
+.tooltip kbd {
+  background: #23272f;
+  border-color: #3b424e;
+  color: var(--vidro-muted);
+}
+
+/* O sublinhado sob a palavra espiada, do mesmo verde do produto. */
+.sublinhado {
+  position: absolute;
+  left: 13.7%;
+  top: 79%;
+  width: 12.6%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--vidro-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--vidro-accent) 50%, transparent);
+}
+
+/* --------------------------------------------------------------- seções --- */
+
+section {
+  padding-block: 4.5rem;
+}
+.secao-clara {
+  background: var(--surface);
+  border-block: 1px solid var(--border);
+}
+
+h2 {
+  font-family: var(--reading);
+  font-weight: 400;
+  font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 0;
+  max-width: 22ch;
+}
+.secao-intro {
+  margin: 0.9rem 0 0;
+  color: var(--muted);
+  max-width: 52ch;
+}
+
+.grade {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 3rem;
+}
+.grade-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+.grade-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* O cartão é sempre o degrau oposto ao da seção: branco sobre creme, creme
+   sobre branco. Os dois iguais deixavam o cartão dependendo só da borda de
+   1px para existir. */
+.cartao {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.6rem;
+}
+.secao-clara .cartao {
+  background: var(--bg);
+}
+.cartao h3 {
+  margin: 0.9rem 0 0.4rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.cartao p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+/* ------------------------------------------------------------ o app --- */
+
+.tour {
+  display: grid;
+  gap: 5.5rem;
+  margin-top: 3.5rem;
+}
+.tour-item {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 3.5rem;
+  align-items: center;
+}
+/* Alterna o lado da imagem. A troca é só no desktop: empilhado, a imagem
+   sempre vem antes do texto que a explica. */
+.tour-item:nth-child(even) .tour-tela {
+  order: 2;
+}
+
+.tour-tela {
+  margin: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  /* A sombra é o único lugar da página com profundidade real: ela separa a
+     janela do app do fundo sem precisar de uma moldura desenhada. */
+  box-shadow: 0 24px 60px -32px rgb(43 39 35 / 0.4);
+}
+.tour-tela img {
+  width: 100%;
+  height: auto;
+}
+
+.tour-texto h3 {
+  font-family: var(--reading);
+  font-weight: 400;
+  font-size: 1.9rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.9rem;
+}
+.tour-texto p {
+  margin: 0;
+  color: var(--muted);
+}
+/* Seletor de duas classes para vencer o `.tour-texto p` acima sem `!important`. */
+.tour-texto .tour-nota {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--faint);
+}
+
+/* Passo numerado do "como funciona". */
+.passo-numero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Ícone dos recursos: um quadradinho pastel, alternando as cores da marca. */
+.icone {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+}
+.icone svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke: var(--accent);
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icone-coral {
+  background: color-mix(in srgb, var(--coral) 40%, white);
+}
+.icone-coral svg {
+  stroke: #b4553a;
+}
+.icone-amarelo {
+  background: color-mix(in srgb, var(--amarelo) 40%, white);
+}
+.icone-amarelo svg {
+  stroke: #8a6316;
+}
+
+/* ---------------------------------------------------------- privacidade --- */
+
+.lista-limpa {
+  list-style: none;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 1.1rem;
+  max-width: 46rem;
+}
+.lista-limpa li {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  color: var(--muted);
+}
+.lista-limpa svg {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.25rem;
+  stroke: var(--accent);
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lista-limpa strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ faq --- */
+
+.faq {
+  margin-top: 2.5rem;
+  max-width: 46rem;
+}
+details {
+  border-bottom: 1px solid var(--border);
+}
+details summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 1.15rem 2rem 1.15rem 0;
+  font-weight: 500;
+  position: relative;
+}
+details summary::-webkit-details-marker {
+  display: none;
+}
+details summary::after {
+  content: "+";
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--faint);
+  font-size: 1.3rem;
+  line-height: 1;
+  transition: rotate 180ms var(--ease);
+}
+details[open] summary::after {
+  rotate: 45deg;
+}
+details p {
+  margin: 0 0 1.3rem;
+  color: var(--muted);
+  max-width: 60ch;
+}
+
+/* -------------------------------------------------------------- chamada --- */
+
+.chamada {
+  text-align: center;
+}
+.chamada h2 {
+  margin-inline: auto;
+}
+.chamada .acoes {
+  justify-content: center;
+}
+
+/* --------------------------------------------------------------- rodapé --- */
+
+footer {
+  border-top: 1px solid var(--border);
+  padding-block: 3rem 2.5rem;
+  font-size: 0.9rem;
+}
+.rodape-grade {
+  display: grid;
+  grid-template-columns: 2fr repeat(2, 1fr);
+  gap: 2.5rem;
+}
+footer h4 {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  font-weight: 600;
+}
+footer ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+footer ul a {
+  color: var(--muted);
+}
+footer ul a:hover {
+  color: var(--text);
+}
+.rodape-nota {
+  margin: 2.5rem 0 0;
+  color: var(--faint);
+  font-size: 0.82rem;
+}
+
+/* ------------------------------------------------------------ responsivo --- */
+
+@media (max-width: 900px) {
+  .grade-3,
+  .grade-2 {
+    grid-template-columns: 1fr;
+  }
+  .tour {
+    gap: 3.5rem;
+  }
+  .tour-item {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  /* Empilhado, a imagem vem sempre antes do texto que a explica — a
+     alternância de lados só faz sentido em duas colunas. */
+  .tour-item:nth-child(even) .tour-tela {
+    order: 0;
+  }
+  .rodape-grade {
+    grid-template-columns: 1fr 1fr;
+  }
+  .menu {
+    display: none;
+  }
+  /* O mock do herói é uma imagem de tela: abaixo desta largura o tooltip
+     cairia em cima da palavra errada. Sem ele, a imagem ainda mostra o jogo. */
+  .tooltip,
+  .sublinhado {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+  .botao:hover {
+    transform: none;
+  }
+}

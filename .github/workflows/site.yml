@@ -1,0 +1,47 @@
+# Publica a landing (`site/`) no GitHub Pages.
+#
+# Por que um workflow e nao a opcao "serve a partir de uma pasta": o Pages so
+# aceita a raiz do repo ou `/docs`, e `/docs` ja e a especificacao do produto.
+# O workflow copia `site/` como esta — nao ha build, porque a pagina e HTML e
+# CSS escritos a mao (ver `site/README.md`).
+#
+# Antes do primeiro deploy: em Settings > Pages, marcar "Source: GitHub Actions".
+
+name: site
+
+on:
+  push:
+    branches: [main]
+    # Nao republica o site quando so o app muda.
+    paths:
+      - "site/**"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Um deploy por vez; um push novo no meio de um deploy cancela o anterior.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
