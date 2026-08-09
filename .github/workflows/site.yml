@@ -1,21 +1,24 @@
 # Publica a landing (`site/`) no GitHub Pages.
 #
 # Por que um workflow e nao a opcao "serve a partir de uma pasta": o Pages so
-# aceita a raiz do repo ou `/docs`, e `/docs` ja e a especificacao do produto.
-# O workflow copia `site/` como esta — nao ha build, porque a pagina e HTML e
-# CSS escritos a mao (ver `site/README.md`).
+# aceita a raiz do repo ou `/docs`, e este site mora em `site/`. O workflow
+# copia a pasta como esta — nao ha build, porque a pagina e HTML e CSS
+# escritos a mao (ver `site/README.md`).
 #
 # Antes do primeiro deploy: em Settings > Pages, marcar "Source: GitHub Actions".
+#
+# SEM FILTRO DE `paths`, de proposito. Ele existia quando este workflow morava
+# no repositorio do aplicativo, para nao republicar o site a cada mudanca de
+# codigo. Aqui so existe o site, entao o filtro nao protegia nada — e cobrava
+# caro: o GitHub nao avalia `paths` em push que reescreve o historico ou que
+# cria a branch, e nos dois casos o deploy silenciosamente nao rodou. O site
+# ficou servindo uma versao velha enquanto o repositorio ja tinha a nova.
 
 name: site
 
 on:
   push:
     branches: [main]
-    # Nao republica o site quando so o app muda.
-    paths:
-      - "site/**"
-      - ".github/workflows/site.yml"
   workflow_dispatch:
 
 permissions:
