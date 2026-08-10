@@ -30,11 +30,18 @@
   --vidro-muted: #a9a29b;
   --vidro-accent: #8fd3b0;
 
+  /* Uma família só, em dois tamanhos ópticos — ver o bloco de tipografia em
+     `theme.css` do app. Nada é baixado: a `Inter` que estava aqui nunca foi
+     carregada em lugar nenhum, e a cadeia caía na Segoe UI legada. */
   --sans:
-    "Inter", ui-sans-serif, system-ui, "Segoe UI Variable Text", "Segoe UI",
+    "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont,
+    system-ui, "Helvetica Neue", Arial, sans-serif;
+  --display:
+    "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI",
+    -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue", Arial,
     sans-serif;
-  --reading: "Georgia", "Iowan Old Style", ui-serif, serif;
-  --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", monospace;
+  --mono:
+    "Cascadia Code", "Segoe UI Mono", "JetBrains Mono", ui-monospace, monospace;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 
   --largura: 68rem;
@@ -122,8 +129,9 @@ kbd {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  font-family: var(--reading);
+  font-family: var(--display);
   font-size: 1.2rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text);
 }
@@ -240,9 +248,12 @@ kbd {
   font-weight: 500;
 }
 
+/* Peso 700, e não os 400 de antes: com a serifada, o contraste de desenho já
+   separava título de corpo. Com uma família só, quem separa é o peso — um
+   título grande em peso normal lê como texto grande, não como título. */
 h1 {
-  font-family: var(--reading);
-  font-weight: 400;
+  font-family: var(--display);
+  font-weight: 700;
   font-size: clamp(2.4rem, 5.5vw, 3.9rem);
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -362,8 +373,8 @@ section {
 }
 
 h2 {
-  font-family: var(--reading);
-  font-weight: 400;
+  font-family: var(--display);
+  font-weight: 700;
   font-size: clamp(1.8rem, 3.5vw, 2.5rem);
   line-height: 1.15;
   letter-spacing: -0.02em;
@@ -446,8 +457,8 @@ h2 {
 }
 
 .tour-texto h3 {
-  font-family: var(--reading);
-  font-weight: 400;
+  font-family: var(--display);
+  font-weight: 600;
   font-size: 1.9rem;
   letter-spacing: -0.01em;
   margin: 0 0 0.9rem;
