@@ -10,35 +10,34 @@
     Sem traço de contorno em lugar nenhum: em 16 px um stroke de 1 px come
     metade do desenho. Tudo é forma cheia, e o contraste vem da diferença de
     tom entre penacho (claro), cabeça (escuro) e bico (quente).
+
+    **Sem fundo.** Havia um quadrado arredondado em degradê verde atrás de
+    tudo, e ele era o problema: um glifo escuro sobre um quadrado do mesmo tom
+    mais claro é a assinatura visual de aplicativo gerado em série. A marca é o
+    pássaro, e ele tem que se sustentar sobre qualquer superfície — a barra
+    clara do app, o vidro escuro da overlay, a bandeja do Windows. O desenho é
+    reposicionado para preencher a moldura que o fundo ocupava.
   -->
-  <defs>
-    <linearGradient id="pp-fundo" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#E7F5EE" />
-      <stop offset="1" stop-color="#C9E8D9" />
-    </linearGradient>
-  </defs>
+  <g transform="translate(-14.7 -0.3) scale(1.15)">
+    <!-- Penacho: duas penas varridas para trás. -->
+    <g fill="#57B894">
+      <path d="M34 34Q26 21 19 10Q32 17 40 30Z" />
+      <path d="M44 28Q40 15 42 5Q50 14 50 26Z" />
+    </g>
 
-  <rect width="96" height="96" rx="24" fill="url(#pp-fundo)" />
+    <!-- Bico/play. Pintado antes da cabeça para a base do triângulo ficar
+         escondida sob ela: só a ponta aparece, e ela é o bico. -->
+    <path d="M58 35L88 51Q90 52.5 88 54L58 70Z" fill="#F4C871" />
 
-  <!-- Penacho: duas penas varridas para trás. Eram três; a terceira apontava
-       para fora do badge e virava uma folha solta em vez de pena. -->
-  <g fill="#57B894">
-    <path d="M34 34Q26 21 19 10Q32 17 40 30Z" />
-    <path d="M44 28Q40 15 42 5Q50 14 50 26Z" />
+    <!-- Cabeça -->
+    <circle cx="44" cy="54" r="25" fill="#2F8F6F" />
+
+    <!-- Bochecha: a única aparição do coral na marca. Opaca, e não translúcida —
+         coral a 50% sobre verde escuro dá oliva, que lia como sujeira. -->
+    <circle cx="36" cy="64" r="7" fill="#F2A98C" />
+
+    <!-- Olho -->
+    <circle cx="55" cy="46" r="5.5" fill="#FBF8F3" />
+    <circle cx="56.4" cy="46" r="2.6" fill="#22322B" />
   </g>
-
-  <!-- Bico/play. Pintado antes da cabeça para a base do triângulo ficar
-       escondida sob ela: só a ponta aparece, e ela é o bico. -->
-  <path d="M58 35L88 51Q90 52.5 88 54L58 70Z" fill="#F4C871" />
-
-  <!-- Cabeça -->
-  <circle cx="44" cy="54" r="25" fill="#2F8F6F" />
-
-  <!-- Bochecha: a única aparição do coral na marca. Opaca, e não translúcida —
-       coral a 50% sobre verde escuro dá oliva, que lia como sujeira. -->
-  <circle cx="36" cy="64" r="7" fill="#F2A98C" />
-
-  <!-- Olho -->
-  <circle cx="55" cy="46" r="5.5" fill="#FBF8F3" />
-  <circle cx="56.4" cy="46" r="2.6" fill="#22322B" />
 </svg>

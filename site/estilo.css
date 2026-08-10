@@ -138,10 +138,11 @@ kbd {
 .marca:hover {
   text-decoration: none;
 }
+/* Sem `border-radius`: ele existia para arredondar o quadrado de fundo que a
+   marca tinha atrás do pássaro. Sem o fundo, arredondar não recorta nada. */
 .marca img {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
 }
 
 .menu {
@@ -201,51 +202,32 @@ kbd {
 
 /* ---------------------------------------------------------------- herói --- */
 
+/* Sem as duas manchas pastel desfocadas que ficavam atrás do herói.
+ *
+ * Elas eram um `blur(90px)` em verde e coral nos cantos, e são o clichê mais
+ * datado desse tipo de página — a mesma aquarela aparece em qualquer landing
+ * montada a partir de um modelo. O fundo creme sozinho já separa o herói do
+ * resto, e o que tem que chamar atenção aqui é a captura do produto, não uma
+ * névoa colorida atrás dela. */
 .heroi {
   padding-block: 5rem 4rem;
   position: relative;
-  overflow: hidden;
-}
-/* Duas manchas pastel muito difusas: dão o ar de aquarela sem virar gradiente
-   de fundo, que envelhece mal. */
-.heroi::before,
-.heroi::after {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.5;
-  pointer-events: none;
-}
-.heroi::before {
-  width: 30rem;
-  height: 30rem;
-  background: var(--accent-soft);
-  top: -12rem;
-  right: -8rem;
-}
-.heroi::after {
-  width: 22rem;
-  height: 22rem;
-  background: var(--coral);
-  opacity: 0.22;
-  bottom: -10rem;
-  left: -6rem;
-}
-.heroi .envolucro {
-  position: relative;
 }
 
+/* Uma linha de texto, e não uma pílula.
+ *
+ * Era fundo em verde lavado com o texto no mesmo verde mais escuro — a forma
+ * mais reconhecível de página gerada em série, e ela aparecia três vezes nesta
+ * página (aqui, no número do passo e atrás de cada ícone). Três fatos sobre o
+ * produto não precisam de recipiente: em versalete espaçado eles se separam do
+ * título por tamanho e cor, que é o resto da hierarquia desta página. */
 .selo {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-radius: 999px;
-  padding: 0.35rem 0.85rem;
-  font-size: 0.8rem;
+  display: block;
+  color: var(--faint);
+  font-size: 0.78rem;
   font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* Peso 700, e não os 400 de antes: com a serifada, o contraste de desenho já
@@ -475,48 +457,46 @@ h2 {
 }
 
 /* Passo numerado do "como funciona". */
+/* O número, e não um selo com o número dentro.
+ *
+ * Numeral grande e claro: ele ordena os três cartões sem virar um objeto por
+ * conta própria. O quadrado tingido que havia aqui competia com o título do
+ * passo e repetia a mesma dupla de cores do resto da página. */
 .passo-numero {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 10px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 600;
-  font-size: 0.9rem;
+  display: block;
+  margin-bottom: 0.6rem;
+  color: var(--border-strong);
+  font-family: var(--display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Ícone dos recursos: um quadradinho pastel, alternando as cores da marca. */
+/* O ícone solto, sem o quadradinho tingido atrás.
+ *
+ * Eram três variantes do mesmo truque — traço escuro sobre um quadrado do
+ * mesmo tom lavado, em verde, coral e amarelo. O fundo não dizia nada que o
+ * desenho já não dissesse, e as três cores rodando entre os itens faziam a
+ * lista parecer uma paleta em vez de uma lista.
+ *
+ * O traço fica no tom do texto secundário: o ícone acompanha o título do item,
+ * não disputa com ele. E some a divisão coral/amarelo/verde — cor no produto
+ * inteiro significa estado (salvo, erro), nunca decoração (F7). */
 .icone {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  background: var(--accent-soft);
+  display: block;
+  width: 1.35rem;
+  height: 1.35rem;
 }
 .icone svg {
-  width: 1.15rem;
-  height: 1.15rem;
-  stroke: var(--accent);
+  width: 100%;
+  height: 100%;
+  stroke: var(--muted);
   fill: none;
-  stroke-width: 1.75;
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-.icone-coral {
-  background: color-mix(in srgb, var(--coral) 40%, white);
-}
-.icone-coral svg {
-  stroke: #b4553a;
-}
-.icone-amarelo {
-  background: color-mix(in srgb, var(--amarelo) 40%, white);
-}
-.icone-amarelo svg {
-  stroke: #8a6316;
 }
 
 /* ---------------------------------------------------------- privacidade --- */
